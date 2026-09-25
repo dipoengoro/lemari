@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -337,6 +338,12 @@ def tangani_update(update: dict) -> None:
         return
 
     teks = (pesan.get("text") or pesan.get("caption") or "").strip()
+
+    # jangan menanggapi pesan yang dialamatkan ke bot lain (mis. /start@diposh_bot)
+    sebutan = re.findall(r"@([A-Za-z0-9_]{4,})", teks)
+    if sebutan and BOT_USERNAME not in sebutan:
+        return
+
     if pesan.get("photo") or (pesan.get("document") or {}).get("mime_type", "").startswith("image/"):
         tangani_foto(pesan)
         return
@@ -348,6 +355,7 @@ def tangani_update(update: dict) -> None:
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logging.getLogger("httpx").setLevel(logging.WARNING)  # URL permintaan memuat token; cukup peringatan saja
     if not TOKEN:
         raise SystemExit("LEMARI_BOT_TOKEN belum diatur")
     DATA_DIR.mkdir(parents=True, exist_ok=True)
