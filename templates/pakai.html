@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block judul %}Pakai hari ini · Lemari{% endblock %}
+{% block isi %}
+<h1 class="text-xl font-semibold">Pakai hari ini</h1>
+<p class="mt-1 text-sm text-slate-400">Centang barang yang dipakai, lalu simpan. Hanya barang berstatus bersih yang muncul di sini.</p>
+
+<form method="post" action="/pakai" class="mt-4 space-y-4">
+  <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+    <label class="text-sm">
+      <span class="text-slate-400">Tanggal</span>
+      <input type="date" name="tanggal" value="{{ tanggal }}"
+             class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+    </label>
+    <label class="text-sm">
+      <span class="text-slate-400">Okasi</span>
+      <input name="okasi" placeholder="kerja / santai" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+    </label>
+    <label class="text-sm">
+      <span class="text-slate-400">Cuaca</span>
+      <input name="cuaca" placeholder="panas / hujan" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+    </label>
+    <label class="flex items-end gap-2 pb-2 text-sm">
+      <input type="checkbox" name="jadi_kotor" value="1" checked class="h-4 w-4 accent-emerald-500">
+      <span class="text-slate-300">langsung tandai kotor</span>
+    </label>
+  </div>
+  <input name="catatan" placeholder="catatan (opsional)"
+         class="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm">
+
+  <div class="flex gap-2">
+    <input type="search" name="q" value="{{ q }}" placeholder="cari barang…"
+           class="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm">
+    <button class="rounded-lg bg-slate-800 px-4 py-2 text-sm">Cari</button>
+  </div>
+
+  <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+    {% for item in items %}
+    <label class="cursor-pointer overflow-hidden rounded-xl border border-slate-800 bg-slate-900/60 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-950/30">
+      <input type="checkbox" name="item_ids" value="{{ item.id }}" class="peer sr-only">
+      {% set foto = item.foto_utama %}
+      {% if foto %}
+      <img src="/media/{{ foto.thumb_relatif }}" class="h-28 w-full object-cover" loading="lazy" alt="{{ item.nama }}">
+      {% else %}
+      <div class="flex h-28 w-full items-center justify-center bg-slate-800 text-2xl">👕</div>
+      {% endif %}
+      <span class="block truncate px-2 py-1 text-xs">{{ item.nama }}</span>
+    </label>
+    {% else %}
+    <p class="col-span-full text-sm text-slate-500">Belum ada barang bersih yang bisa dipakai. Tambah item dulu di katalog.</p>
+    {% endfor %}
+  </div>
+
+  <button class="w-full rounded-lg bg-emerald-600 px-5 py-3 font-medium hover:bg-emerald-500">
+    Simpan pemakaian {{ tanggal }}
+  </button>
+</form>
+
+<section class="mt-8">
+  <h2 class="text-sm font-medium text-slate-300">Sudah tercatat tanggal {{ tanggal }}</h2>
+  <ul class="mt-2 divide-y divide-slate-800 rounded-xl border border-slate-800 bg-slate-900/60 text-sm">
+    {% for w in sudah_dipakai %}
+    <li class="flex items-center justify-between gap-3 px-4 py-2">
+      <span>
+        {% if w.item %}<a href="/item/{{ w.item.id }}" class="hover:text-emerald-400">{{ w.item.nama }}</a>
+        {% else %}(outfit){% endif %}
+        {% if w.okasi %}<span class="text-xs text-slate-500">· {{ w.okasi }}</span>{% endif %}
+        {% if w.cuaca %}<span class="text-xs text-slate-500">· {{ w.cuaca }}</span>{% endif %}
+      </span>
+      <form method="post" action="/pakai/{{ w.id }}/hapus">
+        <button class="text-xs text-rose-400">hapus</button>
+      </form>
+    </li>
+    {% else %}
+    <li class="px-4 py-3 text-slate-500">Belum ada catatan untuk tanggal ini.</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}
