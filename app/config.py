@@ -15,7 +15,7 @@ def _env(name: str, default: str = "") -> str:
 DSN_RAW = _env("LEMARI_DSN") or _env("DATABASE_URL")
 
 APP_NAME = _env("LEMARI_APP_NAME", "Lemari")
-VERSION = "0.3.1"
+VERSION = "0.3.2"
 DOMAIN = _env("LEMARI_DOMAIN", "lemari.dipo.sh")
 UPLOAD_DIR = Path(_env("LEMARI_UPLOAD_DIR", str(BASE_DIR / "data" / "uploads")))
 

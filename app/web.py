@@ -432,10 +432,11 @@ def halaman_pakai(
             or_(func.lower(Item.nama).like(pola), func.lower(func.coalesce(Item.brand, "")).like(pola))
         )
     items = session.scalars(stmt.limit(200)).all()
+    hari = _tanggal_dari_form(tanggal) or date.today()
     dipakai_hari_ini = session.scalars(
         select(WearLog)
         .options(selectinload(WearLog.item))
-        .where(WearLog.tanggal == datetime.strptime(tanggal, "%Y-%m-%d").date() if tanggal else date.today())
+        .where(WearLog.tanggal == hari)
         .order_by(WearLog.id.desc())
     ).all()
     return templates.TemplateResponse(
@@ -446,7 +447,7 @@ def halaman_pakai(
             "user": request.state.user,
             "items": items,
             "q": q,
-            "tanggal": tanggal or date.today().isoformat(),
+            "tanggal": hari.isoformat(),
             "sudah_dipakai": dipakai_hari_ini,
         },
     )
