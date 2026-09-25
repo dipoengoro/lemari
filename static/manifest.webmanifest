@@ -1,0 +1,21 @@
+{
+  "name": "Lemari — pencatat barang yang dipakai",
+  "short_name": "Lemari",
+  "description": "Catat pakaian, sepatu, tas, aksesoris, dan parfum: foto, pemakaian, cuci, pinjam-meminjam.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "lang": "id",
+  "icons": [
+    { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/static/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Tambah item", "url": "/item/baru" },
+    { "name": "Katalog", "url": "/" }
+  ]
+}
