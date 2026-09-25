@@ -363,11 +363,16 @@ def main() -> None:
     aku = tg("getMe").get("result") or {}
     log.info("bot jalan sebagai @%s (id %s) · topik %s:%s · whitelist %s",
              aku.get("username"), aku.get("id"), CHAT_ID, THREAD_ID, sorted(ALLOWED) or "semua")
-    kirim(
-        "🧺 Bot Lemari sudah nyala.\n\n"
-        "Kirim foto barang → ade baca isinya pakai AI → kakak tinggal tekan Simpan.\n"
-        f"Ketik /bantu@{BOT_USERNAME} buat lihat daftar perintah."
-    )
+
+    # banner hanya sekali per instalasi — restart jangan menambah pesan di topik
+    penanda = DATA_DIR / "bot-siap.json"
+    if not penanda.exists():
+        kirim(
+            "🧺 Bot Lemari sudah nyala.\n\n"
+            "Kirim foto barang → ade baca isinya pakai AI → kakak tinggal tekan Simpan.\n"
+            f"Ketik /bantu@{BOT_USERNAME} buat lihat daftar perintah."
+        )
+        _tulis_json(penanda, {"mulai": datetime.now(timezone.utc).isoformat(timespec="seconds")})
 
     offset = int(_baca_json(OFFSET_FILE, {"offset": 0}).get("offset", 0))
     while True:
