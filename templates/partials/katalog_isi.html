@@ -1,0 +1,58 @@
+<div id="daftar">
+  <p class="mb-3 text-sm text-slate-400">
+    {{ total }} item{% if q %} untuk "{{ q }}"{% endif %}
+    {%- if halaman > 1 %} · halaman {{ halaman }}{% endif %}
+  </p>
+
+  {% if not items %}
+  <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-6 text-center">
+    <p class="text-slate-300">Belum ada item yang cocok.</p>
+    <a href="/item/baru" class="mt-3 inline-block rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium">Tambah item pertama</a>
+  </div>
+  {% else %}
+  <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+    {% for item in items %}
+    <div class="group overflow-hidden rounded-xl border border-slate-800 bg-slate-900/60">
+      <div class="relative">
+        <label class="absolute left-2 top-2 z-10 rounded bg-slate-950/70 p-1">
+          <input type="checkbox" name="item_ids" value="{{ item.id }}" class="h-4 w-4 accent-emerald-500" form="form-bulk">
+        </label>
+        <a href="/item/{{ item.id }}" class="block">
+          {% set foto = item.foto_utama %}
+          {% if foto %}
+          <img src="/media/{{ foto.thumb_relatif }}" alt="{{ item.nama }}" loading="lazy"
+               class="h-40 w-full object-cover bg-slate-800">
+          {% else %}
+          <div class="flex h-40 w-full items-center justify-center bg-slate-800 text-3xl">👕</div>
+          {% endif %}
+        </a>
+        <span class="absolute right-2 top-2 rounded bg-slate-950/70 px-2 py-0.5 text-[11px]">{{ item.status }}</span>
+      </div>
+      <div class="p-2">
+        <a href="/item/{{ item.id }}" class="block truncate text-sm font-medium">{{ item.nama }}</a>
+        <p class="truncate text-xs text-slate-500">
+          {{ item.kategori.nama if item.kategori else 'tanpa kategori' }}
+          {%- if item.warna_utama %} · {{ item.warna_utama }}{% endif %}
+        </p>
+        {% if item.lokasi %}<p class="truncate text-[11px] text-slate-600">📍 {{ item.lokasi.nama }}</p>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% set total_hal = ((total + per_halaman - 1) // per_halaman) %}
+  {% if total_hal > 1 %}
+  <div class="mt-5 flex items-center justify-center gap-3 text-sm">
+    {% if halaman > 1 %}
+    <a class="rounded-lg border border-slate-700 px-3 py-1.5"
+       href="?q={{ q }}&kategori={{ f_kategori }}&lokasi={{ f_lokasi }}&status={{ f_status }}&tag={{ f_tag }}&halaman={{ halaman - 1 }}">← Sebelumnya</a>
+    {% endif %}
+    <span class="text-slate-500">{{ halaman }} / {{ total_hal }}</span>
+    {% if halaman < total_hal %}
+    <a class="rounded-lg border border-slate-700 px-3 py-1.5"
+       href="?q={{ q }}&kategori={{ f_kategori }}&lokasi={{ f_lokasi }}&status={{ f_status }}&tag={{ f_tag }}&halaman={{ halaman + 1 }}">Berikutnya →</a>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% endif %}
+</div>
