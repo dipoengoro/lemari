@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ app_name }}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <main class="mx-auto max-w-2xl px-5 py-10">
+    <h1 class="text-3xl font-semibold">🧺 {{ app_name }}</h1>
+    <p class="mt-2 text-slate-400">Pencatat semua barang yang dipakai: pakaian, sepatu, tas, aksesoris, parfum.</p>
+
+    <div class="mt-6 rounded-xl border border-slate-800 bg-slate-900/60 p-4 text-sm">
+      <div class="flex items-center justify-between">
+        <span class="text-slate-400">Versi</span><span>{{ version }}</span>
+      </div>
+      <div class="mt-2 flex items-center justify-between">
+        <span class="text-slate-400">Database</span>
+        <span class="{{ 'text-emerald-400' if db_ok else 'text-rose-400' }}">
+          {{ 'terhubung' if db_ok else 'GAGAL' }}
+        </span>
+      </div>
+      {% if db_error %}<p class="mt-2 text-xs text-rose-400 break-all">{{ db_error }}</p>{% endif %}
+      <div class="mt-2 flex items-center justify-between">
+        <span class="text-slate-400">User</span><span>{{ user or 'belum terdeteksi (SSO)' }}</span>
+      </div>
+    </div>
+
+    <section class="mt-8">
+      <h2 class="text-lg font-medium">Rencana pembangunan</h2>
+      <ol class="mt-3 space-y-1 text-sm text-slate-300 list-decimal list-inside">
+        <li>Fase 0 — infrastruktur, healthz, SSO <span class="text-emerald-400">(sekarang di sini)</span></li>
+        <li>Fase 1 — skema data + katalog item + upload foto + PWA installable</li>
+        <li>Fase 2 — catat pemakaian + cost per wear + auto-tag AI dari foto</li>
+        <li>Fase 3 — cuci sendiri &amp; laundry (batch, biaya, pengingat)</li>
+        <li>Fase 4 — outfit, wishlist, pinjam-meminjam</li>
+        <li>Fase 5 — dashboard statistik</li>
+        <li>Fase 6 — bot Telegram @dipo_housekeeper_bot</li>
+      </ol>
+    </section>
+
+    <p class="mt-8 text-xs text-slate-500">{{ domain }} · /healthz</p>
+  </main>
+</body>
+</html>
