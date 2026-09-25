@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block judul %}{{ item.nama }} · Lemari{% endblock %}
+{% block isi %}
+<a href="/" class="text-sm text-slate-400">← Katalog</a>
+
+<div class="mt-3 grid grid-cols-1 gap-5 sm:grid-cols-2">
+  <div>
+    {% set foto = item.foto_utama %}
+    {% if foto %}
+    <img src="/media/{{ foto.path_relatif }}" alt="{{ item.nama }}"
+         class="w-full rounded-xl border border-slate-800 object-cover">
+    {% else %}
+    <div class="flex h-64 w-full items-center justify-center rounded-xl border border-slate-800 bg-slate-900 text-5xl">👕</div>
+    {% endif %}
+
+    {% if item.photos|length > 1 %}
+    <div class="mt-3 flex gap-2 overflow-x-auto">
+      {% for p in item.photos %}
+      <div class="relative shrink-0">
+        <img src="/media/{{ p.thumb_relatif }}" class="h-16 w-16 rounded-lg object-cover border {{ 'border-emerald-500' if p.is_primary else 'border-slate-800' }}">
+        <form method="post" action="/foto/{{ p.id }}/utama" class="absolute inset-x-0 bottom-0">
+          <button class="w-full rounded-b-lg bg-slate-950/80 text-[10px] py-0.5">utama</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="post" action="/item/{{ item.id }}/foto" enctype="multipart/form-data" class="mt-3 flex gap-2">
+      <input type="file" name="foto" accept="image/*" multiple capture="environment"
+             class="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs">
+      <button class="shrink-0 rounded-lg bg-slate-800 px-3 py-2 text-sm">Tambah foto</button>
+    </form>
+  </div>
+
+  <div>
+    <div class="flex items-start gap-3">
+      <h1 class="text-2xl font-semibold">{{ item.nama }}</h1>
+      <span class="mt-1 rounded bg-slate-800 px-2 py-0.5 text-xs">{{ item.status }}</span>
+    </div>
+
+    <dl class="mt-4 divide-y divide-slate-800 rounded-xl border border-slate-800 bg-slate-900/60 text-sm">
+      {% for label, nilai in [
+        ('Kategori', item.kategori.nama if item.kategori else None),
+        ('Jenis', item.jenis),
+        ('Warna', item.warna_utama),
+        ('Warna sekunder', item.warna_sekunder),
+        ('Bahan', item.bahan),
+        ('Size', item.size),
+        ('Brand', item.brand),
+        ('Pola', item.pola),
+        ('Okasi', item.okasi),
+        ('Lokasi', item.lokasi.nama if item.lokasi else None),
+        ('Kondisi', item.kondisi),
+        ('Harga beli', ('Rp ' ~ '{:,.0f}'.format(item.harga_beli).replace(',', '.')) if item.harga_beli else None),
+        ('Tanggal beli', item.tanggal_beli.strftime('%d %b %Y') if item.tanggal_beli else None),
+      ] %}
+      {% if nilai %}
+      <div class="flex items-center justify-between gap-4 px-4 py-2">
+        <dt class="text-slate-400">{{ label }}</dt>
+        <dd class="text-right">{{ nilai }}</dd>
+      </div>
+      {% endif %}
+      {% endfor %}
+      {% if item.tags %}
+      <div class="flex items-center justify-between gap-4 px-4 py-2">
+        <dt class="text-slate-400">Tag</dt>
+        <dd class="text-right">{% for t in item.tags %}<span class="text-emerald-400">#{{ t.nama }}</span> {% endfor %}</dd>
+      </div>
+      {% endif %}
+    </dl>
+
+    {% if item.catatan %}
+    <div class="mt-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4 text-sm whitespace-pre-line">{{ item.catatan }}</div>
+    {% endif %}
+
+    <div class="mt-4 flex flex-wrap gap-2">
+      <a href="/item/{{ item.id }}/edit" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium">Edit</a>
+      <form method="post" action="/item/{{ item.id }}/hapus"
+            onsubmit="return confirm('Hapus {{ item.nama }} beserta fotonya?')">
+        <button class="rounded-lg border border-rose-800 px-4 py-2 text-sm text-rose-300">Hapus</button>
+      </form>
+    </div>
+
+    <p class="mt-4 text-xs text-slate-600">
+      Dibuat {{ item.created_at.strftime('%d %b %Y %H:%M') }} · diubah {{ item.updated_at.strftime('%d %b %Y %H:%M') }}
+      · id {{ item.id }}
+    </p>
+  </div>
+</div>
+{% endblock %}
