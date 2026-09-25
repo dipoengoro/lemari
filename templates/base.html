@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <title>{% block judul %}Lemari{% endblock %}</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="icon" href="/static/icons/icon-192.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <header class="sticky top-0 z-20 border-b border-slate-800 bg-slate-950/95 backdrop-blur">
+    <div class="mx-auto max-w-5xl px-4 py-3 flex items-center gap-3">
+      <a href="/" class="text-lg font-semibold">🧺 Lemari</a>
+      <span class="text-xs text-slate-500 hidden sm:inline">semua yang kamu pakai</span>
+      <nav class="ml-auto flex items-center gap-3 text-sm">
+        <a href="/" class="hover:text-emerald-400">Katalog</a>
+        <a href="/item/baru" class="rounded-lg bg-emerald-600 px-3 py-1.5 font-medium hover:bg-emerald-500">+ Item</a>
+        <a href="/pengaturan" class="text-slate-400 hover:text-emerald-400">⚙</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-5xl px-4 py-5 pb-24">
+    {% block isi %}{% endblock %}
+  </main>
+
+  <footer class="mx-auto max-w-5xl px-4 pb-10 text-xs text-slate-600">
+    v{{ version | default('0.1.0') }} · {{ user or 'user belum terdeteksi' }}
+  </footer>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+    }
+  </script>
+</body>
+</html>
