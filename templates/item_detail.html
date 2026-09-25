@@ -76,11 +76,54 @@
 
     <div class="mt-4 flex flex-wrap gap-2">
       <a href="/item/{{ item.id }}/edit" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium">Edit</a>
+      <form method="post" action="/pakai">
+        <input type="hidden" name="item_ids" value="{{ item.id }}">
+        <input type="hidden" name="tanggal" value="{{ hari_ini if hari_ini else '' }}">
+        <input type="hidden" name="jadi_kotor" value="1">
+        <button class="rounded-lg bg-slate-800 px-4 py-2 text-sm">Pakai hari ini</button>
+      </form>
       <form method="post" action="/item/{{ item.id }}/hapus"
             onsubmit="return confirm('Hapus {{ item.nama }} beserta fotonya?')">
         <button class="rounded-lg border border-rose-800 px-4 py-2 text-sm text-rose-300">Hapus</button>
       </form>
     </div>
+
+    <div class="mt-4 grid grid-cols-3 gap-2 text-center">
+      <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+        <p class="text-xs text-slate-500">Dipakai</p>
+        <p class="mt-1 text-lg font-semibold">{{ stat.jumlah_pakai }}×</p>
+      </div>
+      <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+        <p class="text-xs text-slate-500">Terakhir</p>
+        <p class="mt-1 text-sm">{{ stat.terakhir_pakai.strftime('%d %b %Y') if stat.terakhir_pakai else '—' }}</p>
+      </div>
+      <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+        <p class="text-xs text-slate-500">Cost / pakai</p>
+        <p class="mt-1 text-sm">
+          {% if stat.cost_per_wear %}Rp {{ '{:,.0f}'.format(stat.cost_per_wear).replace(',', '.') }}{% else %}—{% endif %}
+        </p>
+      </div>
+    </div>
+
+    <section class="mt-4">
+      <h2 class="text-sm font-medium text-slate-300">Riwayat pemakaian</h2>
+      <ul class="mt-2 divide-y divide-slate-800 rounded-xl border border-slate-800 bg-slate-900/60 text-sm">
+        {% for w in pemakaian %}
+        <li class="flex items-center justify-between gap-3 px-4 py-2">
+          <span>
+            {{ w.tanggal.strftime('%d %b %Y') }}
+            {% if w.okasi %}<span class="text-xs text-slate-500">· {{ w.okasi }}</span>{% endif %}
+            {% if w.catatan %}<span class="text-xs text-slate-500">· {{ w.catatan }}</span>{% endif %}
+          </span>
+          <form method="post" action="/pakai/{{ w.id }}/hapus">
+            <button class="text-xs text-rose-400">hapus</button>
+          </form>
+        </li>
+        {% else %}
+        <li class="px-4 py-3 text-slate-500">Belum pernah dicatat dipakai.</li>
+        {% endfor %}
+      </ul>
+    </section>
 
     <p class="mt-4 text-xs text-slate-600">
       Dibuat {{ item.created_at.strftime('%d %b %Y %H:%M') }} · diubah {{ item.updated_at.strftime('%d %b %Y %H:%M') }}
