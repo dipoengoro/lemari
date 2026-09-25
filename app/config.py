@@ -15,7 +15,7 @@ def _env(name: str, default: str = "") -> str:
 DSN_RAW = _env("LEMARI_DSN") or _env("DATABASE_URL")
 
 APP_NAME = _env("LEMARI_APP_NAME", "Lemari")
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 DOMAIN = _env("LEMARI_DOMAIN", "lemari.dipo.sh")
 UPLOAD_DIR = Path(_env("LEMARI_UPLOAD_DIR", str(BASE_DIR / "data" / "uploads")))
 
@@ -30,6 +30,7 @@ DEV_USER = _env("LEMARI_DEV_USER")
 # AI auto-tag (OpenRouter)
 OPENROUTER_KEY = _env("LEMARI_OPENROUTER_KEY")
 VISION_MODEL = _env("LEMARI_VISION_MODEL", "google/gemini-3.8-flash")
+AI_AKTIF = _env("LEMARI_AI", "1") not in ("0", "false", "False", "")
 
 # bot Telegram
 TELEGRAM_BOT_TOKEN = _env("LEMARI_TELEGRAM_BOT_TOKEN") or _env("LEMARI_BOT_TOKEN")
