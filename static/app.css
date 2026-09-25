@@ -1,3 +1,12 @@
 /* gaya tambahan di luar Tailwind CDN */
 :root { color-scheme: dark; }
 body { -webkit-tap-highlight-color: transparent; }
+
+/* aman untuk layar berponi */
+main { padding-bottom: env(safe-area-inset-bottom); }
+
+/* tombol & input biar nyaman disentuh di HP */
+button, a[role="button"] { touch-action: manipulation; }
+input, select, textarea { font-size: 16px; } /* cegah zoom otomatis di iOS/Android */
+
+img { background-color: #1e293b; }
