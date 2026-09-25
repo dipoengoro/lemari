@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block judul %}Riwayat pemakaian · Lemari{% endblock %}
+{% block isi %}
+<div class="flex items-center justify-between">
+  <h1 class="text-xl font-semibold">Riwayat pemakaian</h1>
+  <a href="/pakai" class="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium">+ Catat hari ini</a>
+</div>
+<p class="mt-1 text-sm text-slate-400">Menampilkan {{ hari }} hari terakhir. Klik nama barang untuk lihat detailnya.</p>
+
+{% for tanggal, daftar in per_hari.items() %}
+<section class="mt-5">
+  <h2 class="text-sm font-medium text-slate-300">
+    {{ tanggal.strftime('%A, %d %b %Y') }} <span class="text-slate-500">· {{ daftar|length }} barang</span>
+  </h2>
+  <ul class="mt-2 divide-y divide-slate-800 rounded-xl border border-slate-800 bg-slate-900/60 text-sm">
+    {% for w in daftar %}
+    <li class="flex items-center justify-between gap-3 px-4 py-2">
+      <span>
+        {% if w.item %}<a href="/item/{{ w.item.id }}" class="hover:text-emerald-400">{{ w.item.nama }}</a>
+        {% else %}(outfit){% endif %}
+        {% if w.okasi %}<span class="text-xs text-slate-500">· {{ w.okasi }}</span>{% endif %}
+        {% if w.catatan %}<span class="text-xs text-slate-500">· {{ w.catatan }}</span>{% endif %}
+      </span>
+      <form method="post" action="/pakai/{{ w.id }}/hapus">
+        <button class="text-xs text-rose-400">hapus</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% else %}
+<p class="mt-6 rounded-xl border border-slate-800 bg-slate-900/60 p-6 text-center text-slate-400">
+  Belum ada catatan pemakaian. Mulai dari <a href="/pakai" class="text-emerald-400">Pakai hari ini</a>.
+</p>
+{% endfor %}
+{% endblock %}
