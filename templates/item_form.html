@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block judul %}{{ 'Edit' if item else 'Tambah' }} item · Lemari{% endblock %}
+{% block isi %}
+<h1 class="mb-4 text-xl font-semibold">{{ 'Edit item' if item else 'Tambah item' }}</h1>
+
+<form method="post" enctype="multipart/form-data" action="{{ ('/item/' ~ item.id) if item else '/item' }}" class="space-y-4">
+  <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <label class="sm:col-span-2 text-sm">
+      <span class="text-slate-400">Nama *</span>
+      <input name="nama" required value="{{ item.nama if item else '' }}"
+             class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+    </label>
+
+    <label class="text-sm">
+      <span class="text-slate-400">Kategori</span>
+      <select name="kategori_id" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+        <option value="">— pilih —</option>
+        {% for k in kategoris %}
+        <option value="{{ k.id }}" {% if item and item.kategori_id == k.id %}selected{% endif %}>{{ k.grup }} · {{ k.nama }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label class="text-sm">
+      <span class="text-slate-400">Jenis</span>
+      <input name="jenis" value="{{ item.jenis or '' if item else '' }}"
+             class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+    </label>
+
+    <label class="text-sm">
+      <span class="text-slate-400">Warna utama</span>
+      <input name="warna_utama" value="{{ item.warna_utama or '' if item else '' }}"
+             class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+    </label>
+
+    <label class="text-sm">
+      <span class="text-slate-400">Warna sekunder</span>
+      <input name="warna_sekunder" value="{{ item.warna_sekunder or '' if item else '' }}"
+             class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+    </label>
+
+    <label class="text-sm">
+      <span class="text-slate-400">Bahan</span>
+      <input name="bahan" value="{{ item.bahan or '' if item else '' }}"
+             class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+    </label>
+
+    <label class="text-sm">
+      <span class="text-slate-400">Size</span>
+      <input name="size" value="{{ item.size or '' if item else '' }}"
+             class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+    </label>
+
+    <label class="text-sm">
+      <span class="text-slate-400">Brand</span>
+      <input name="brand" value="{{ item.brand or '' if item else '' }}"
+             class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+    </label>
+
+    <label class="text-sm">
+      <span class="text-slate-400">Pola</span>
+      <input name="pola" value="{{ item.pola or '' if item else '' }}"
+             class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+    </label>
+
+    <label class="text-sm">
+      <span class="text-slate-400">Okasi</span>
+      <input name="okasi" value="{{ item.okasi or '' if item else '' }}" placeholder="kerja, santai, formal…"
+             class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+    </label>
+
+    <label class="text-sm">
+      <span class="text-slate-400">Lokasi simpan</span>
+      <select name="lokasi_id" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+        <option value="">— pilih —</option>
+        {% for l in lokasis %}
+        <option value="{{ l.id }}" {% if item and item.lokasi_id == l.id %}selected{% endif %}>{{ l.nama }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label class="text-sm">
+      <span class="text-slate-400">Harga beli (Rp)</span>
+      <input name="harga_beli" inputmode="numeric" value="{{ item.harga_beli|int if item and item.harga_beli else '' }}"
+             class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+    </label>
+
+    <label class="text-sm">
+      <span class="text-slate-400">Tanggal beli</span>
+      <input type="date" name="tanggal_beli" value="{{ item.tanggal_beli.isoformat() if item and item.tanggal_beli else '' }}"
+             class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+    </label>
+
+    <label class="text-sm">
+      <span class="text-slate-400">Status</span>
+      <select name="status" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+        {% for s in status_list %}
+        <option value="{{ s }}" {% if (item.status if item else 'bersih') == s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label class="text-sm">
+      <span class="text-slate-400">Kondisi</span>
+      <input name="kondisi" value="{{ item.kondisi or '' if item else '' }}" placeholder="baik, ada noda kecil…"
+             class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+    </label>
+
+    <label class="sm:col-span-2 text-sm">
+      <span class="text-slate-400">Tag (pisah pakai koma)</span>
+      <input name="tags" value="{{ item.tags|map(attribute='nama')|join(', ') if item else '' }}" placeholder="kerja, favorit"
+             class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+    </label>
+
+    <label class="sm:col-span-2 text-sm">
+      <span class="text-slate-400">Catatan</span>
+      <textarea name="catatan" rows="3"
+                class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">{{ item.catatan or '' if item else '' }}</textarea>
+    </label>
+
+    <label class="sm:col-span-2 text-sm">
+      <span class="text-slate-400">Foto (bisa beberapa, langsung dari kamera)</span>
+      <input type="file" name="foto" accept="image/*" multiple capture="environment"
+             class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+    </label>
+  </div>
+
+  <div class="flex items-center gap-3">
+    <button class="rounded-lg bg-emerald-600 px-5 py-2.5 font-medium hover:bg-emerald-500">
+      {{ 'Simpan perubahan' if item else 'Simpan item' }}
+    </button>
+    <a href="{{ ('/item/' ~ item.id) if item else '/' }}" class="text-sm text-slate-400">Batal</a>
+  </div>
+</form>
+{% endblock %}
