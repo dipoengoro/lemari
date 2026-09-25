@@ -1,0 +1,20 @@
+services:
+  lemari:
+    build: .
+    image: lemari:dev
+    container_name: lemari
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - TZ=Asia/Jakarta
+    volumes:
+      - ./data:/data
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
+    networks:
+      - proxy-net
+
+networks:
+  proxy-net:
+    external: true
