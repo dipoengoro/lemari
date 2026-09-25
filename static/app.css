@@ -1,0 +1,3 @@
+/* gaya tambahan di luar Tailwind CDN */
+:root { color-scheme: dark; }
+body { -webkit-tap-highlight-color: transparent; }
