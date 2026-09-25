@@ -15,7 +15,7 @@ def _env(name: str, default: str = "") -> str:
 DSN_RAW = _env("LEMARI_DSN") or _env("DATABASE_URL")
 
 APP_NAME = _env("LEMARI_APP_NAME", "Lemari")
-VERSION = "0.7.0"
+VERSION = "0.7.1"
 DOMAIN = _env("LEMARI_DOMAIN", "lemari.dipo.sh")
 UPLOAD_DIR = Path(_env("LEMARI_UPLOAD_DIR", str(BASE_DIR / "data" / "uploads")))
 
@@ -34,6 +34,9 @@ AI_PROVIDER = (_env("LEMARI_AI_PROVIDER") or ("deepseek" if DEEPSEEK_KEY else "o
 _BAWAAAN_MODEL = {"deepseek": "deepseek-flash", "openrouter": "google/gemini-3.8-flash"}
 VISION_MODEL = _env("LEMARI_VISION_MODEL") or _BAWAAAN_MODEL.get(AI_PROVIDER, "google/gemini-3.8-flash")
 AI_AKTIF = _env("LEMARI_AI", "1") not in ("0", "false", "False", "")
+# mode "berpikir" DeepSeek: untuk sekadar membaca atribut barang, hasilnya sama tapi 2,5x lebih hemat
+# dan 2x lebih cepat kalau dimatikan (terukur 26 Sep 2026) — nyalakan kalau mau lebih teliti.
+AI_THINKING = _env("LEMARI_AI_THINKING", "0") not in ("0", "false", "False", "")
 
 # bot Telegram
 TELEGRAM_BOT_TOKEN = _env("LEMARI_TELEGRAM_BOT_TOKEN") or _env("LEMARI_BOT_TOKEN")

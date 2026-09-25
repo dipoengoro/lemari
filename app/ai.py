@@ -28,9 +28,10 @@ def _penyedia() -> dict:
             "url": "https://api.deepseek.com/chat/completions",
             "kunci": config.DEEPSEEK_KEY,
             "headers": {},
-            # model penalaran: token "berpikir" ikut dihitung, jadi jatahnya harus lega
-            "max_tokens": 1600,
+            # model penalaran: token "berpikir" ikut dihitung (terukur sampai 1600), jadi jatahnya lega
+            "max_tokens": 3000,
             "json_mode": True,
+            "extra": {} if config.AI_THINKING else {"thinking": {"type": "disabled"}},
         }
     return {
         "nama": "OpenRouter",
@@ -39,6 +40,7 @@ def _penyedia() -> dict:
         "headers": {"HTTP-Referer": f"https://{config.DOMAIN}", "X-Title": "Lemari"},
         "max_tokens": 700,
         "json_mode": False,
+        "extra": {},
     }
 
 PROMPT = """Kamu membantu mencatat barang yang dipakai sehari-hari (pakaian, sepatu, tas, aksesoris, parfum).
@@ -133,6 +135,7 @@ def tebak_atribut(gambar: bytes, daftar_kategori: list[str], mime: str = "image/
     }
     if penyedia["json_mode"]:
         payload["response_format"] = {"type": "json_object"}
+    payload.update(penyedia.get("extra", {}))
     headers = {
         "Authorization": f"Bearer {penyedia['kunci']}",
         "Content-Type": "application/json",
