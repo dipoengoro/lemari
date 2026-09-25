@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block judul %}Cuci & laundry · Lemari{% endblock %}
+{% block isi %}
+<div class="flex items-center justify-between">
+  <h1 class="text-xl font-semibold">Cuci &amp; laundry</h1>
+  <a href="/cuci/baru" class="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium">+ Batch baru</a>
+</div>
+<p class="mt-1 text-sm text-slate-400">Dua jalur: cuci sendiri dan setoran laundry (nama, tanggal, estimasi, biaya, no nota).</p>
+
+{% if nyangkut %}
+<section class="mt-5 rounded-xl border border-amber-800 bg-amber-950/30 p-4">
+  <h2 class="text-sm font-medium text-amber-300">Barang nyangkut ({{ nyangkut|length }})</h2>
+  <p class="mt-1 text-xs text-amber-200/80">Statusnya masih dicuci/laundry tapi tidak ada batch berjalan yang menampungnya. Buka barangnya dan betulkan statusnya.</p>
+  <ul class="mt-2 flex flex-wrap gap-2">
+    {% for it in nyangkut %}
+    <li><a href="/item/{{ it.id }}" class="rounded-lg bg-amber-900/40 px-3 py-1 text-xs">{{ it.nama }}</a></li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<section class="mt-6">
+  <h2 class="text-sm font-medium text-slate-300">Batch berjalan</h2>
+  {% for b in berjalan %}
+  <article class="mt-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="rounded-lg px-2 py-0.5 text-xs font-medium
+        {% if b.jalur == 'laundry' %}bg-sky-900/50 text-sky-300{% else %}bg-emerald-900/50 text-emerald-300{% endif %}">
+        {{ 'Laundry' if b.jalur == 'laundry' else 'Cuci sendiri' }}
+      </span>
+      {% if b.nama_laundry %}<span class="text-sm">{{ b.nama_laundry }}</span>{% endif %}
+      {% if b.layanan %}<span class="text-xs text-slate-500">· {{ b.layanan }}</span>{% endif %}
+      {% if b.no_nota %}<span class="text-xs text-slate-500">· nota {{ b.no_nota }}</span>{% endif %}
+      {% if b.lewat_estimasi %}
+      <span class="rounded-lg bg-rose-900/50 px-2 py-0.5 text-xs text-rose-300">harus diambil — estimasi {{ b.estimasi_selesai.strftime('%d %b') }}</span>
+      {% endif %}
+      {% if (hari_ini - b.tanggal_mulai).days >= 5 %}
+      <span class="rounded-lg bg-amber-900/50 px-2 py-0.5 text-xs text-amber-300">nyangkut {{ (hari_ini - b.tanggal_mulai).days }} hari</span>
+      {% endif %}
+      <span class="ml-auto text-xs text-slate-500">mulai {{ b.tanggal_mulai.strftime('%d %b %Y') }}{% if b.estimasi_selesai %} · estimasi {{ b.estimasi_selesai.strftime('%d %b') }}{% endif %}</span>
+    </div>
+
+    <ul class="mt-3 flex flex-wrap gap-2">
+      {% for wi in b.isi %}
+      <li class="flex items-center gap-1 rounded-lg bg-slate-800 px-2 py-1 text-xs">
+        <a href="/item/{{ wi.item.id }}" class="hover:text-emerald-400">{{ wi.item.nama }}</a>
+        <form method="post" action="/cuci/{{ b.id }}/item/{{ wi.id }}/hapus">
+          <button class="text-rose-400">×</button>
+        </form>
+      </li>
+      {% else %}
+      <li class="text-xs text-slate-500">Belum ada barang di batch ini.</li>
+      {% endfor %}
+    </ul>
+
+    {% if b.biaya or b.catatan_kondisi or b.catatan %}
+    <p class="mt-2 text-xs text-slate-400">
+      {% if b.biaya %}biaya Rp {{ '{:,.0f}'.format(b.biaya|float).replace(',', '.') }}{% if b.biaya_per_item %} (≈ Rp {{ '{:,.0f}'.format(b.biaya_per_item).replace(',', '.') }}/barang){% endif %}{% endif %}
+      {% if b.catatan_kondisi %}<br>kondisi: {{ b.catatan_kondisi }}{% endif %}
+      {% if b.catatan %}<br>catatan: {{ b.catatan }}{% endif %}
+    </p>
+    {% endif %}
+
+    <div class="mt-3 grid gap-2 sm:grid-cols-2">
+      <form method="post" action="/cuci/{{ b.id }}/selesai" class="flex flex-wrap items-end gap-2">
+        <label class="text-xs text-slate-400">selesai
+          <input type="date" name="tanggal_selesai" value="{{ hari_ini }}" class="mt-1 w-36 rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-sm">
+        </label>
+        {% if b.jalur == 'laundry' %}
+        <label class="text-xs text-slate-400">biaya (Rp)
+          <input name="biaya" inputmode="numeric" value="{{ ('%.0f'|format(b.biaya|float)) if b.biaya else '' }}"
+                 class="mt-1 w-28 rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-sm">
+        </label>
+        {% endif %}
+        <label class="flex items-center gap-1 text-xs text-slate-300">
+          <input type="checkbox" name="kembali_bersih" value="1" checked class="h-4 w-4 accent-emerald-500"> semua jadi bersih
+        </label>
+        <label class="text-xs text-slate-400">catatan kondisi (opsional)
+          <input name="catatan_kondisi" value="{{ b.catatan_kondisi or '' }}" class="mt-1 w-52 rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-sm">
+        </label>
+        <button class="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium">Tandai selesai</button>
+      </form>
+      <form method="post" action="/cuci/{{ b.id }}/batal" class="flex items-end"
+            onsubmit="return confirm('Batalkan batch ini? Status barang dikembalikan seperti sebelumnya.')">
+        <button class="rounded-lg border border-rose-800 px-3 py-1.5 text-xs text-rose-300">Batalkan batch</button>
+      </form>
+    </div>
+
+    <details class="mt-3">
+      <summary class="cursor-pointer text-xs text-slate-400">Tambah barang ke batch ini</summary>
+      <div class="mt-2">
+        <a href="/cuci/{{ b.id }}/tambah" class="rounded-lg bg-slate-800 px-3 py-1 text-xs">Pilih barang lain…</a>
+      </div>
+    </details>
+  </article>
+  {% else %}
+  <p class="mt-3 rounded-xl border border-slate-800 bg-slate-900/60 p-5 text-sm text-slate-400">
+    Tidak ada batch berjalan. Mulai dari <a href="/cuci/baru" class="text-emerald-400">Batch baru</a>.
+  </p>
+  {% endfor %}
+</section>
+
+{% if rekap %}
+<section class="mt-8">
+  <h2 class="text-sm font-medium text-slate-300">Rekap biaya laundry</h2>
+  <ul class="mt-2 divide-y divide-slate-800 rounded-xl border border-slate-800 bg-slate-900/60 text-sm">
+    {% for r in rekap %}
+    <li class="flex items-center justify-between px-4 py-2">
+      <span>{{ r[0] }}</span>
+      <span class="text-slate-400">{{ r[1] }} batch · {{ r[2] }} barang</span>
+      <span>Rp {{ '{:,.0f}'.format(r[3]|float).replace(',', '.') }}</span>
+      <span class="text-xs text-slate-500">≈ Rp {{ '{:,.0f}'.format(r[4]|float).replace(',', '.') }}/barang</span>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+{% if selesai %}
+<section class="mt-8">
+  <h2 class="text-sm font-medium text-slate-300">Selesai terakhir</h2>
+  <ul class="mt-2 divide-y divide-slate-800 rounded-xl border border-slate-800 bg-slate-900/60 text-sm">
+    {% for b in selesai %}
+    <li class="px-4 py-2">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-xs text-slate-500">{{ b.tanggal_selesai.strftime('%d %b %Y') if b.tanggal_selesai else '-' }}</span>
+        <span>{{ 'Laundry' if b.jalur == 'laundry' else 'Cuci sendiri' }}{% if b.nama_laundry %} — {{ b.nama_laundry }}{% endif %}</span>
+        <span class="text-xs text-slate-500">{{ b.jumlah_item }} barang{% if b.biaya %} · Rp {{ '{:,.0f}'.format(b.biaya|float).replace(',', '.') }}{% endif %}</span>
+      </div>
+      <p class="mt-1 text-xs text-slate-400">{{ b.isi | map(attribute='item.nama') | join(', ') }}</p>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% endblock %}

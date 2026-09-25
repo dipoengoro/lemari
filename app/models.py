@@ -20,6 +20,7 @@ from sqlalchemy import (
     String,
     Table,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -110,6 +111,9 @@ class Item(Base):
         back_populates="item", cascade="all, delete-orphan", order_by="ItemPhoto.urutan, ItemPhoto.id"
     )
     tags: Mapped[list[Tag]] = relationship(secondary=item_tags, back_populates="items")
+    riwayat_cuci: Mapped[list["WashItem"]] = relationship(
+        back_populates="item", cascade="all, delete-orphan", order_by="WashItem.id.desc()"
+    )
     pemakaian: Mapped[list["WearLog"]] = relationship(
         back_populates="item", cascade="all, delete-orphan", order_by="WearLog.tanggal.desc()"
     )
@@ -143,6 +147,71 @@ class WearLog(Base):
     __table_args__ = (
         Index("ix_wear_log_item_tanggal", "item_id", "tanggal"),
         Index("ix_wear_log_tanggal", "tanggal"),
+    )
+
+
+class WashBatch(Base):
+    """Satu batch cuci sendiri atau satu setoran laundry."""
+
+    __tablename__ = "wash_batches"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    jalur: Mapped[str] = mapped_column(String(20), default="sendiri")  # sendiri | laundry
+    nama_laundry: Mapped[str | None] = mapped_column(String(80))
+    layanan: Mapped[str | None] = mapped_column(String(60))
+    no_nota: Mapped[str | None] = mapped_column(String(60))
+    tanggal_mulai: Mapped[date] = mapped_column(Date)
+    estimasi_selesai: Mapped[date | None] = mapped_column(Date)
+    tanggal_selesai: Mapped[date | None] = mapped_column(Date)
+    biaya: Mapped[float | None] = mapped_column(Numeric(12, 2))
+    catatan_kondisi: Mapped[str | None] = mapped_column(Text)
+    catatan: Mapped[str | None] = mapped_column(Text)
+    selesai: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    isi: Mapped[list["WashItem"]] = relationship(
+        back_populates="batch", cascade="all, delete-orphan", order_by="WashItem.id"
+    )
+
+    __table_args__ = (Index("ix_wash_batches_selesai_mulai", "selesai", "tanggal_mulai"),)
+
+    @property
+    def jumlah_item(self) -> int:
+        return len(self.isi)
+
+    @property
+    def biaya_per_item(self) -> float | None:
+        if self.biaya and self.jumlah_item:
+            return float(self.biaya) / self.jumlah_item
+        return None
+
+    @property
+    def lewat_estimasi(self) -> bool:
+        """Laundry yang seharusnya sudah diambil tapi belum ditandai selesai."""
+        if self.selesai or not self.estimasi_selesai:
+            return False
+        return self.estimasi_selesai < date.today()
+
+
+class WashItem(Base):
+    """Satu barang di dalam satu batch cuci."""
+
+    __tablename__ = "wash_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    batch_id: Mapped[int] = mapped_column(ForeignKey("wash_batches.id", ondelete="CASCADE"))
+    item_id: Mapped[int] = mapped_column(ForeignKey("items.id", ondelete="CASCADE"))
+    status_sebelum: Mapped[str | None] = mapped_column(String(20))
+    catatan: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    batch: Mapped[WashBatch] = relationship(back_populates="isi")
+    item: Mapped["Item"] = relationship(back_populates="riwayat_cuci")
+
+    __table_args__ = (
+        UniqueConstraint("batch_id", "item_id", name="uq_wash_items_batch_item"),
+        Index("ix_wash_items_batch", "batch_id"),
+        Index("ix_wash_items_item", "item_id"),
     )
 
 

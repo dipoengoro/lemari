@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block judul %}Tambah barang ke batch · Lemari{% endblock %}
+{% block isi %}
+<a href="/cuci" class="text-sm text-slate-400">← Cuci &amp; laundry</a>
+<h1 class="mt-2 text-xl font-semibold">
+  Tambah barang ke batch {{ 'laundry' if batch.jalur == 'laundry' else 'cuci sendiri' }}{% if batch.nama_laundry %} — {{ batch.nama_laundry }}{% endif %}
+</h1>
+<p class="mt-1 text-sm text-slate-400">Barang yang sudah ada di batch ini tidak muncul lagi di daftar.</p>
+
+<form method="get" action="/cuci/{{ batch.id }}/tambah" class="mt-3 flex gap-2">
+  <input type="search" name="q" value="{{ q }}" placeholder="cari barang…" class="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm">
+  <button class="rounded-lg bg-slate-800 px-4 py-2 text-sm">Cari</button>
+</form>
+
+<form method="post" action="/cuci/{{ batch.id }}/item/tambah" class="mt-4">
+  <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+    {% for item in items %}
+    <label class="cursor-pointer overflow-hidden rounded-xl border border-slate-800 bg-slate-900/60 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-950/30">
+      <input type="checkbox" name="item_ids" value="{{ item.id }}" class="peer sr-only">
+      {% set foto = item.foto_utama %}
+      {% if foto %}
+      <img src="/media/{{ foto.thumb_relatif }}" class="h-24 w-full object-cover" loading="lazy" alt="{{ item.nama }}">
+      {% else %}
+      <div class="flex h-24 w-full items-center justify-center bg-slate-800 text-2xl">👕</div>
+      {% endif %}
+      <span class="block truncate px-2 py-1 text-xs">{{ item.nama }}</span>
+      <span class="block truncate px-2 pb-1 text-[10px] text-slate-500">{{ item.status }}</span>
+    </label>
+    {% else %}
+    <p class="col-span-full text-sm text-slate-500">Tidak ada barang lain yang bisa ditambahkan.</p>
+    {% endfor %}
+  </div>
+  <button class="mt-4 w-full rounded-lg bg-emerald-600 px-5 py-3 font-medium">Tambahkan ke batch</button>
+</form>
+{% endblock %}

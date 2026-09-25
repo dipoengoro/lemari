@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from . import ai, config, media
 from .db import get_session
-from .models import STATUS_ITEM, Category, Item, ItemPhoto, Location, Tag, WearLog
+from .models import STATUS_ITEM, Category, Item, ItemPhoto, Location, Tag, WashBatch, WashItem, WearLog
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(config.BASE_DIR / "templates"))
@@ -205,6 +205,8 @@ def detail(request: Request, item_id: int, session: Session = Depends(get_sessio
             "user": request.state.user,
             "stat": statistik_item(session, item.id),
             "pemakaian": sorted(item.pemakaian, key=lambda w: (w.tanggal, w.id), reverse=True)[:30],
+            "cuci_berjalan": next((wi for wi in item.riwayat_cuci if not wi.batch.selesai), None),
+            "riwayat_cuci": item.riwayat_cuci[:10],
         },
     )
 
@@ -531,6 +533,251 @@ async def api_tebak(foto: UploadFile = File(...), session: Session = Depends(get
         obj = session.scalar(select(Category).where(Category.nama == saran["kategori"]))
         saran["kategori_id"] = obj.id if obj else None
     return {"ok": True, "saran": saran}
+
+
+# ---------- Fase 3: cuci sendiri & laundry ----------
+
+JALUR_CUCI = ("sendiri", "laundry")
+STATUS_SELESAI_CUCI = {"sendiri": "dicuci", "laundry": "laundry"}
+
+
+def _batch_berjalan(session: Session) -> list[WashBatch]:
+    return list(
+        session.scalars(
+            select(WashBatch)
+            .options(selectinload(WashBatch.isi).selectinload(WashItem.item))
+            .where(WashBatch.selesai.is_(False))
+            .order_by(WashBatch.tanggal_mulai, WashBatch.id)
+        ).all()
+    )
+
+
+@router.get("/cuci", response_class=HTMLResponse)
+def halaman_cuci(request: Request, session: Session = Depends(get_session)):
+    berjalan = _batch_berjalan(session)
+    selesai = session.scalars(
+        select(WashBatch)
+        .options(selectinload(WashBatch.isi).selectinload(WashItem.item))
+        .where(WashBatch.selesai.is_(True))
+        .order_by(WashBatch.tanggal_selesai.desc().nullslast(), WashBatch.id.desc())
+        .limit(15)
+    ).all()
+    rekap = session.execute(
+        text("select bulan, jumlah_batch, jumlah_item, total_biaya, biaya_per_item from v_laundry_bulanan limit 6")
+    ).fetchall()
+
+    # barang yang statusnya di cuci/laundry tapi tidak terhubung batch berjalan (data nyangkut)
+    nyangkut = session.scalars(
+        select(Item)
+        .options(selectinload(Item.photos))
+        .where(Item.status.in_(tuple(STATUS_SELESAI_CUCI.values())))
+        .where(
+            ~Item.id.in_(
+                select(WashItem.item_id)
+                .join(WashBatch, WashBatch.id == WashItem.batch_id)
+                .where(WashBatch.selesai.is_(False))
+            )
+        )
+        .order_by(Item.updated_at)
+    ).all()
+
+    return templates.TemplateResponse(
+        request,
+        "cuci.html",
+        {
+            "request": request,
+            "user": request.state.user,
+            "berjalan": berjalan,
+            "selesai": selesai,
+            "rekap": rekap,
+            "nyangkut": nyangkut,
+            "hari_ini": date.today(),
+        },
+    )
+
+
+@router.get("/cuci/baru", response_class=HTMLResponse)
+def form_cuci(
+    request: Request,
+    item_id: str = "",
+    jalur: str = "sendiri",
+    semua: str = "",
+    session: Session = Depends(get_session),
+):
+    """Pilih jalur + barang yang mau dicuci. Default hanya barang berstatus kotor."""
+    status_ambil = ["kotor"] if not semua else ["kotor", "bersih", "disimpan"]
+    items = session.scalars(
+        select(Item)
+        .options(selectinload(Item.photos), selectinload(Item.kategori))
+        .where(Item.status.in_(status_ambil))
+        .order_by(Item.updated_at.desc())
+        .limit(300)
+    ).all()
+    terpilih = {int(x) for x in item_id.replace(" ", "").split(",") if x.isdigit()}
+    return templates.TemplateResponse(
+        request,
+        "cuci_form.html",
+        {
+            "request": request,
+            "user": request.state.user,
+            "items": items,
+            "terpilih": terpilih,
+            "jalur": jalur if jalur in JALUR_CUCI else "sendiri",
+            "semua": bool(semua),
+            "hari_ini": date.today(),
+        },
+    )
+
+
+@router.post("/cuci/baru")
+def simpan_cuci(
+    jalur: str = Form("sendiri"),
+    item_ids: list[str] = Form(default=[]),
+    tanggal_mulai: str = Form(""),
+    estimasi_selesai: str = Form(""),
+    nama_laundry: str = Form(""),
+    layanan: str = Form(""),
+    no_nota: str = Form(""),
+    biaya: str = Form(""),
+    catatan_kondisi: str = Form(""),
+    catatan: str = Form(""),
+    session: Session = Depends(get_session),
+):
+    jalur = jalur if jalur in JALUR_CUCI else "sendiri"
+    ids = [int(i) for i in item_ids if i.isdigit()]
+    if not ids:
+        return RedirectResponse("/cuci/baru?kosong=1", status_code=303)
+
+    batch = WashBatch(
+        jalur=jalur,
+        nama_laundry=nama_laundry.strip() or None,
+        layanan=layanan.strip() or None,
+        no_nota=no_nota.strip() or None,
+        tanggal_mulai=_tanggal_dari_form(tanggal_mulai) or date.today(),
+        estimasi_selesai=_tanggal_dari_form(estimasi_selesai),
+        biaya=_angka_dari_form(biaya),
+        catatan_kondisi=catatan_kondisi.strip() or None,
+        catatan=catatan.strip() or None,
+        selesai=False,
+    )
+    session.add(batch)
+    session.flush()
+
+    status_baru = STATUS_SELESAI_CUCI[jalur]
+    for item_id in ids:
+        item = session.get(Item, item_id)
+        if not item:
+            continue
+        session.add(
+            WashItem(batch_id=batch.id, item_id=item.id, status_sebelum=item.status or "kotor")
+        )
+        item.status = status_baru
+    session.commit()
+    return RedirectResponse("/cuci", status_code=303)
+
+
+@router.get("/cuci/{batch_id}/tambah", response_class=HTMLResponse)
+def form_tambah_ke_batch(batch_id: int, request: Request, q: str = "", session: Session = Depends(get_session)):
+    """Halaman pemilih barang untuk ditambahkan ke batch yang sedang jalan."""
+    batch = session.scalars(
+        select(WashBatch).options(selectinload(WashBatch.isi)).where(WashBatch.id == batch_id)
+    ).first()
+    if not batch or batch.selesai:
+        raise HTTPException(404, "Batch tidak ditemukan atau sudah selesai")
+    sudah = {wi.item_id for wi in batch.isi}
+    stmt = (
+        select(Item)
+        .options(selectinload(Item.photos))
+        .where(Item.status.in_(("kotor", "bersih", "disimpan")))
+        .order_by(Item.updated_at.desc())
+        .limit(300)
+    )
+    if q:
+        stmt = stmt.where(func.lower(Item.nama).like(f"%{q.lower()}%"))
+    items = [i for i in session.scalars(stmt).all() if i.id not in sudah]
+    return templates.TemplateResponse(
+        request,
+        "cuci_tambah.html",
+        {"request": request, "user": request.state.user, "batch": batch, "items": items, "q": q},
+    )
+
+
+@router.post("/cuci/{batch_id}/item/tambah")
+def tambah_item_cuci(
+    batch_id: int,
+    item_ids: list[str] = Form(default=[]),
+    session: Session = Depends(get_session),
+):
+    batch = session.get(WashBatch, batch_id)
+    if not batch or batch.selesai:
+        raise HTTPException(404, "Batch tidak ditemukan atau sudah selesai")
+    sudah = {wi.item_id for wi in batch.isi}
+    for mentah in item_ids:
+        if not mentah.isdigit():
+            continue
+        item = session.get(Item, int(mentah))
+        if not item or item.id in sudah:
+            continue
+        session.add(
+            WashItem(batch_id=batch.id, item_id=item.id, status_sebelum=item.status or "kotor")
+        )
+        item.status = STATUS_SELESAI_CUCI.get(batch.jalur, "dicuci")
+    session.commit()
+    return RedirectResponse("/cuci", status_code=303)
+
+
+@router.post("/cuci/{batch_id}/item/{wash_item_id}/hapus")
+def hapus_item_cuci(batch_id: int, wash_item_id: int, session: Session = Depends(get_session)):
+    baris = session.get(WashItem, wash_item_id)
+    if baris and baris.batch_id == batch_id:
+        item = session.get(Item, baris.item_id)
+        if item and baris.status_sebelum:
+            item.status = baris.status_sebelum
+        session.delete(baris)
+        session.commit()
+    return RedirectResponse("/cuci", status_code=303)
+
+
+@router.post("/cuci/{batch_id}/selesai")
+def selesai_cuci(
+    batch_id: int,
+    tanggal_selesai: str = Form(""),
+    biaya: str = Form(""),
+    catatan_kondisi: str = Form(""),
+    kembali_bersih: str = Form("1"),
+    session: Session = Depends(get_session),
+):
+    batch = session.get(WashBatch, batch_id)
+    if not batch:
+        raise HTTPException(404, "Batch tidak ditemukan")
+    batch.selesai = True
+    batch.tanggal_selesai = _tanggal_dari_form(tanggal_selesai) or date.today()
+    nilai_biaya = _angka_dari_form(biaya)
+    if nilai_biaya is not None:
+        batch.biaya = nilai_biaya
+    if catatan_kondisi.strip():
+        batch.catatan_kondisi = catatan_kondisi.strip()
+    if kembali_bersih:
+        for wi in batch.isi:
+            item = session.get(Item, wi.item_id)
+            if item:
+                item.status = "bersih"
+    session.commit()
+    return RedirectResponse("/cuci", status_code=303)
+
+
+@router.post("/cuci/{batch_id}/batal")
+def batal_cuci(batch_id: int, session: Session = Depends(get_session)):
+    batch = session.get(WashBatch, batch_id)
+    if not batch:
+        raise HTTPException(404, "Batch tidak ditemukan")
+    for wi in batch.isi:
+        item = session.get(Item, wi.item_id)
+        if item and wi.status_sebelum:
+            item.status = wi.status_sebelum
+    session.delete(batch)
+    session.commit()
+    return RedirectResponse("/cuci", status_code=303)
 
 
 @router.get("/media/{jalur:path}")

@@ -82,6 +82,8 @@
         <input type="hidden" name="jadi_kotor" value="1">
         <button class="rounded-lg bg-slate-800 px-4 py-2 text-sm">Pakai hari ini</button>
       </form>
+      <a href="/cuci/baru?item_id={{ item.id }}{{ '&jalur=laundry' if cuci_berjalan and cuci_berjalan.batch.jalur == 'laundry' else '' }}"
+         class="rounded-lg bg-slate-800 px-4 py-2 text-sm">Kirim cuci</a>
       <form method="post" action="/item/{{ item.id }}/hapus"
             onsubmit="return confirm('Hapus {{ item.nama }} beserta fotonya?')">
         <button class="rounded-lg border border-rose-800 px-4 py-2 text-sm text-rose-300">Hapus</button>
@@ -121,6 +123,34 @@
         </li>
         {% else %}
         <li class="px-4 py-3 text-slate-500">Belum pernah dicatat dipakai.</li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    <section class="mt-4">
+      <h2 class="text-sm font-medium text-slate-300">Cuci &amp; laundry</h2>
+      {% if cuci_berjalan %}
+      <p class="mt-2 rounded-lg border border-sky-800 bg-sky-950/30 px-4 py-2 text-sm text-sky-300">
+        Sekarang {{ 'di laundry' if cuci_berjalan.batch.jalur == 'laundry' else 'sedang dicuci' }}
+        {% if cuci_berjalan.batch.nama_laundry %}di {{ cuci_berjalan.batch.nama_laundry }}{% endif %}
+        sejak {{ cuci_berjalan.batch.tanggal_mulai.strftime('%d %b %Y') }}
+        {% if cuci_berjalan.batch.estimasi_selesai %}· estimasi selesai {{ cuci_berjalan.batch.estimasi_selesai.strftime('%d %b %Y') }}{% endif %}
+      </p>
+      {% endif %}
+      <ul class="mt-2 divide-y divide-slate-800 rounded-xl border border-slate-800 bg-slate-900/60 text-sm">
+        {% for wi in riwayat_cuci %}
+        <li class="flex flex-wrap items-center justify-between gap-2 px-4 py-2">
+          <span>
+            {{ wi.batch.tanggal_mulai.strftime('%d %b %Y') }}
+            · {{ 'laundry' if wi.batch.jalur == 'laundry' else 'cuci sendiri' }}{% if wi.batch.nama_laundry %} ({{ wi.batch.nama_laundry }}){% endif %}
+          </span>
+          <span class="text-xs text-slate-500">
+            {% if wi.batch.selesai %}selesai {{ wi.batch.tanggal_selesai.strftime('%d %b %Y') if wi.batch.tanggal_selesai else '' }}{% else %}berjalan{% endif %}
+            {% if wi.batch.biaya and wi.batch.jumlah_item %}· ≈ Rp {{ '{:,.0f}'.format((wi.batch.biaya|float) / wi.batch.jumlah_item).replace(',', '.') }}{% endif %}
+          </span>
+        </li>
+        {% else %}
+        <li class="px-4 py-3 text-slate-500">Belum pernah masuk cuci/laundry.</li>
         {% endfor %}
       </ul>
     </section>
