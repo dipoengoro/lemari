@@ -20,7 +20,9 @@ from app import models  # noqa: F401,E402  (biar semua tabel terdaftar di metada
 config = context.config
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # disable_existing_loggers=False → jangan matikan logger uvicorn/aplikasi
+    # (kalau True, semua log setelah migrasi hilang dari `docker logs`)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 if not config.get_main_option("sqlalchemy.url", None):
     dsn = app_config.sqlalchemy_dsn()
