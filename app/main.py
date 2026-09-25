@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from . import config, db
+from .api_bot import router as bot_router
 from .web import router as web_router
 
 log = logging.getLogger("lemari")
@@ -72,6 +73,7 @@ class UserMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(UserMiddleware)
 app.include_router(web_router)
+app.include_router(bot_router)
 
 
 @app.get("/healthz")

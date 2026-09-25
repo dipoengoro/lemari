@@ -117,7 +117,16 @@ def tebak_atribut(gambar: bytes, daftar_kategori: list[str], mime: str = "image/
             if resp.status_code == 200:
                 isi = resp.json()["choices"][0]["message"].get("content") or ""
                 log.info("auto-tag ok: %s KiB → %s", len(isi_gambar) // 1024, str(isi)[:120].replace("\n", " "))
-                hasil = _bersihkan_json(isi)
+                try:
+                    hasil = _bersihkan_json(isi)
+                except AiGagal as exc:
+                    # model kadang menjawab prosa tanpa JSON — itu kegagalan percobaan, bukan alasan menyerah
+                    pesan_terakhir = str(exc)
+                    log.warning("auto-tag percobaan %s: %s | balasan mentah: %s",
+                                ke, exc, str(isi)[:300].replace("\n", " "))
+                    if ke < PERCOBAAN:
+                        time.sleep(1.5 * ke)
+                    continue
                 hasil["kategori"] = _paskan_kategori(hasil.get("kategori"), daftar_kategori)
                 for kunci in ("nama", "jenis", "warna_utama", "warna_sekunder", "bahan", "pola", "okasi", "catatan"):
                     nilai = hasil.get(kunci)

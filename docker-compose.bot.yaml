@@ -1,0 +1,22 @@
+services:
+  lemari-bot:
+    image: ghcr.io/dipoengoro/lemari:latest
+    container_name: lemari-bot
+    command: ["python", "-m", "bot.main"]
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - TZ=Asia/Jakarta
+      - LEMARI_API_URL=http://lemari:8000
+      - LEMARI_BOT_DATA=/data
+      - LEMARI_BOT_USER=dipo
+    volumes:
+      - ./data:/data
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    networks:
+      - proxy-net
+
+networks:
+  proxy-net:
+    external: true
