@@ -1,7 +1,7 @@
 services:
   lemari:
     build: .
-    image: lemari:dev
+    image: ghcr.io/dipoengoro/lemari:latest
     container_name: lemari
     restart: unless-stopped
     env_file: .env
