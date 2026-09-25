@@ -9,12 +9,12 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import Session, selectinload
 
-from . import config, media
+from . import ai, config, media
 from .db import get_session
-from .models import STATUS_ITEM, Category, Item, ItemPhoto, Location, Tag
+from .models import STATUS_ITEM, Category, Item, ItemPhoto, Location, Tag, WearLog
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(config.BASE_DIR / "templates"))
@@ -199,7 +199,13 @@ def detail(request: Request, item_id: int, session: Session = Depends(get_sessio
     return templates.TemplateResponse(
         request,
         "item_detail.html",
-        {"request": request, "item": item, "user": request.state.user},
+        {
+            "request": request,
+            "item": item,
+            "user": request.state.user,
+            "stat": statistik_item(session, item.id),
+            "pemakaian": sorted(item.pemakaian, key=lambda w: (w.tanggal, w.id), reverse=True)[:30],
+        },
     )
 
 
@@ -385,6 +391,145 @@ def hapus_taksonomi(jenis: str = Form(...), id_: int = Form(..., alias="id"), se
             session.delete(obj)
             session.commit()
     return RedirectResponse("/pengaturan", status_code=303)
+
+
+def statistik_item(session: Session, item_id: int) -> dict:
+    """Ambil angka pakai dari view v_cost_per_wear (sekali query, aman walau nol pemakaian)."""
+    baris = session.execute(
+        text(
+            "select jumlah_pakai, terakhir_pakai, cost_per_wear, harga_beli "
+            "from v_cost_per_wear where item_id = :i"
+        ),
+        {"i": item_id},
+    ).fetchone()
+    if not baris:
+        return {"jumlah_pakai": 0, "terakhir_pakai": None, "cost_per_wear": None, "harga_beli": None}
+    return {
+        "jumlah_pakai": baris[0] or 0,
+        "terakhir_pakai": baris[1],
+        "cost_per_wear": float(baris[2]) if baris[2] is not None else None,
+        "harga_beli": float(baris[3]) if baris[3] is not None else None,
+    }
+
+
+@router.get("/pakai", response_class=HTMLResponse)
+def halaman_pakai(
+    request: Request,
+    q: str = "",
+    tanggal: str = "",
+    session: Session = Depends(get_session),
+):
+    """Pilih item yang dipakai (hanya yang siap dipakai: bersih / belum dicuci)."""
+    stmt = (
+        select(Item)
+        .options(selectinload(Item.photos), selectinload(Item.kategori))
+        .where(Item.status.in_(["bersih", "disimpan"]))
+        .order_by(Item.updated_at.desc())
+    )
+    if q:
+        pola = f"%{q.lower()}%"
+        stmt = stmt.where(
+            or_(func.lower(Item.nama).like(pola), func.lower(func.coalesce(Item.brand, "")).like(pola))
+        )
+    items = session.scalars(stmt.limit(200)).all()
+    dipakai_hari_ini = session.scalars(
+        select(WearLog)
+        .options(selectinload(WearLog.item))
+        .where(WearLog.tanggal == datetime.strptime(tanggal, "%Y-%m-%d").date() if tanggal else date.today())
+        .order_by(WearLog.id.desc())
+    ).all()
+    return templates.TemplateResponse(
+        request,
+        "pakai.html",
+        {
+            "request": request,
+            "user": request.state.user,
+            "items": items,
+            "q": q,
+            "tanggal": tanggal or date.today().isoformat(),
+            "sudah_dipakai": dipakai_hari_ini,
+        },
+    )
+
+
+@router.post("/pakai")
+def simpan_pakai(
+    item_ids: list[str] = Form(default=[]),
+    tanggal: str = Form(""),
+    okasi: str = Form(""),
+    cuaca: str = Form(""),
+    catatan: str = Form(""),
+    jadi_kotor: str = Form(""),
+    session: Session = Depends(get_session),
+):
+    hari = _tanggal_dari_form(tanggal) or date.today()
+    ids = [int(i) for i in item_ids if i.isdigit()]
+    for item_id in ids:
+        item = session.get(Item, item_id)
+        if not item:
+            continue
+        session.add(
+            WearLog(
+                tanggal=hari,
+                item_id=item.id,
+                okasi=okasi.strip() or item.okasi,
+                cuaca=cuaca.strip() or None,
+                catatan=catatan.strip() or None,
+            )
+        )
+        if jadi_kotor:
+            item.status = "kotor"
+    session.commit()
+    return RedirectResponse(f"/pakai?tanggal={hari.isoformat()}", status_code=303)
+
+
+@router.post("/pakai/{wear_id}/hapus")
+def hapus_pakai(wear_id: int, session: Session = Depends(get_session)):
+    baris = session.get(WearLog, wear_id)
+    tujuan = "/riwayat"
+    if baris:
+        if baris.item_id:
+            tujuan = f"/item/{baris.item_id}"
+        session.delete(baris)
+        session.commit()
+    return RedirectResponse(tujuan, status_code=303)
+
+
+@router.get("/riwayat", response_class=HTMLResponse)
+def riwayat(request: Request, hari: int = 60, session: Session = Depends(get_session)):
+    batas = date.today().toordinal() - hari
+    baris = session.scalars(
+        select(WearLog)
+        .options(selectinload(WearLog.item))
+        .where(WearLog.tanggal >= date.fromordinal(batas))
+        .order_by(WearLog.tanggal.desc(), WearLog.id.desc())
+    ).all()
+    per_hari: dict[date, list[WearLog]] = {}
+    for b in baris:
+        per_hari.setdefault(b.tanggal, []).append(b)
+    return templates.TemplateResponse(
+        request,
+        "riwayat.html",
+        {"request": request, "user": request.state.user, "per_hari": per_hari, "hari": hari},
+    )
+
+
+@router.post("/api/tebak")
+async def api_tebak(foto: UploadFile = File(...), session: Session = Depends(get_session)):
+    """Usulan atribut dari foto (dipakai tombol 'isi otomatis' di form). Tidak pernah menyimpan item."""
+    data = await foto.read()
+    if not data:
+        return {"ok": False, "pesan": "foto kosong"}
+    daftar = session.scalars(select(Category.nama).order_by(Category.urutan)).all()
+    try:
+        saran = ai.tebak_atribut(data, list(daftar), mime=foto.content_type or "image/jpeg")
+    except ai.AiGagal as exc:
+        return {"ok": False, "pesan": str(exc)}
+    saran["kategori_id"] = None
+    if saran.get("kategori"):
+        obj = session.scalar(select(Category).where(Category.nama == saran["kategori"]))
+        saran["kategori_id"] = obj.id if obj else None
+    return {"ok": True, "saran": saran}
 
 
 @router.get("/media/{jalur:path}")
