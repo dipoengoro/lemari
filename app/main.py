@@ -18,8 +18,28 @@ from .web import router as web_router
 log = logging.getLogger("lemari")
 
 
+def _siapkan_log() -> None:
+    """Log aplikasi harus kelihatan di `docker logs`.
+
+    Alembic memanggil fileConfig saat migrasi dan itu menimpa handler root, jadi
+    handler kita dipasang ulang secara paksa (dan dipanggil lagi setelah migrasi).
+    """
+    akar = logging.getLogger()
+    for handler_lama in list(akar.handlers):
+        akar.removeHandler(handler_lama)
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    akar.addHandler(handler)
+    akar.setLevel(logging.INFO)
+    # alembic memanggil fileConfig; tanpa disable_existing_loggers=False logger lain dimatikan
+    for nama in ("lemari", "lemari.ai", "uvicorn", "uvicorn.error", "uvicorn.access", "httpx"):
+        logging.getLogger(nama).disabled = False
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
+
 def jalankan_migrasi() -> None:
     """Naikkan skema ke revisi terakhir saat container start (idempoten)."""
+    _siapkan_log()
     cfg = AlembicConfig(str(config.BASE_DIR / "alembic.ini"))
     cfg.set_main_option("script_location", str(config.BASE_DIR / "alembic"))
     cfg.set_main_option("sqlalchemy.url", config.sqlalchemy_dsn())
@@ -34,6 +54,7 @@ async def lifespan(_: FastAPI):
     except Exception as exc:  # noqa: BLE001
         # jangan matikan app: /healthz harus tetap bisa menjawab agar kelihatan penyebabnya
         log.error("migrasi gagal: %s", str(exc)[:300])
+    _siapkan_log()  # pastikan log app tetap kelihatan setelah alembic menimpa handler root
     yield
 
 
