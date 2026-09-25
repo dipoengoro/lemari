@@ -120,9 +120,19 @@
 
     <label class="sm:col-span-2 text-sm">
       <span class="text-slate-400">Foto (bisa beberapa, langsung dari kamera)</span>
-      <input type="file" name="foto" accept="image/*" multiple capture="environment"
+      <input type="file" name="foto" accept="image/*" multiple capture="environment" id="input-foto"
              class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
     </label>
+
+    <div class="sm:col-span-2 rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+      <div class="flex items-center gap-3">
+        <button type="button" id="tombol-tebak"
+                class="rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium hover:bg-slate-700">
+          ✨ Isi otomatis dari foto
+        </button>
+        <span id="status-tebak" class="text-xs text-slate-500">AI cuma mengusulkan — kakak tetap yang putuskan.</span>
+      </div>
+    </div>
   </div>
 
   <div class="flex items-center gap-3">
@@ -132,4 +142,63 @@
     <a href="{{ ('/item/' ~ item.id) if item else '/' }}" class="text-sm text-slate-400">Batal</a>
   </div>
 </form>
+
+<script>
+  const tombol = document.getElementById('tombol-tebak');
+  const status = document.getElementById('status-tebak');
+  const inputFoto = document.getElementById('input-foto');
+
+  tombol?.addEventListener('click', async () => {
+    const berkas = inputFoto?.files?.[0];
+    if (!berkas) {
+      status.textContent = 'Pilih foto dulu di atas, baru tekan tombol ini.';
+      status.className = 'text-xs text-amber-400';
+      return;
+    }
+    status.textContent = 'AI sedang membaca foto…';
+    status.className = 'text-xs text-slate-400';
+    tombol.disabled = true;
+    try {
+      const borang = new FormData();
+      borang.append('foto', berkas);
+      const res = await fetch('/api/tebak', { method: 'POST', body: borang });
+      const data = await res.json();
+      if (!data.ok) {
+        status.textContent = data.pesan || 'Gagal membaca foto.';
+        status.className = 'text-xs text-amber-400';
+        return;
+      }
+      const s = data.saran;
+      const isi = (nama, nilai) => {
+        const el = document.querySelector(`[name="${nama}"]`);
+        if (el && nilai && !el.value) {
+          el.value = nilai;
+          el.classList.add('ring-1', 'ring-emerald-500');
+        }
+      };
+      isi('nama', s.nama);
+      isi('jenis', s.jenis);
+      isi('warna_utama', s.warna_utama);
+      isi('warna_sekunder', s.warna_sekunder);
+      isi('bahan', s.bahan);
+      isi('pola', s.pola);
+      isi('okasi', s.okasi);
+      isi('catatan', s.catatan);
+      if (s.kategori_id) {
+        const sel = document.querySelector('[name="kategori_id"]');
+        if (sel && !sel.value) {
+          sel.value = s.kategori_id;
+          sel.classList.add('ring-1', 'ring-emerald-500');
+        }
+      }
+      status.textContent = 'Usulan terisi (kolom yang kosong saja) — silakan koreksi.';
+      status.className = 'text-xs text-emerald-400';
+    } catch (err) {
+      status.textContent = 'Gagal menghubungi server.';
+      status.className = 'text-xs text-rose-400';
+    } finally {
+      tombol.disabled = false;
+    }
+  });
+</script>
 {% endblock %}
