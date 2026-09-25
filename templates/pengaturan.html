@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block judul %}Pengaturan · Lemari{% endblock %}
+{% block isi %}
+<h1 class="text-xl font-semibold">Pengaturan taksonomi</h1>
+<p class="mt-1 text-sm text-slate-400">{{ jumlah_item }} item tercatat. Kategori &amp; lokasi bisa ditambah sambil jalan.</p>
+
+<div class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2">
+  <section class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+    <h2 class="font-medium">Kategori</h2>
+    <form method="post" action="/pengaturan/kategori" class="mt-3 flex gap-2">
+      <input name="nama" placeholder="nama kategori" required class="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm">
+      <input name="grup" placeholder="grup" class="w-28 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm">
+      <button class="shrink-0 rounded-lg bg-emerald-600 px-3 py-2 text-sm">Tambah</button>
+    </form>
+    <ul class="mt-3 space-y-1 text-sm">
+      {% for k in kategoris %}
+      <li class="flex items-center justify-between rounded-lg bg-slate-950/40 px-3 py-1.5">
+        <span>{{ k.nama }} <span class="text-xs text-slate-500">· {{ k.grup }}</span></span>
+        {% if not k.is_default %}
+        <form method="post" action="/pengaturan/hapus">
+          <input type="hidden" name="jenis" value="kategori"><input type="hidden" name="id" value="{{ k.id }}">
+          <button class="text-xs text-rose-400">hapus</button>
+        </form>
+        {% else %}<span class="text-xs text-slate-600">bawaan</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+    <h2 class="font-medium">Lokasi simpan</h2>
+    <form method="post" action="/pengaturan/lokasi" class="mt-3 flex gap-2">
+      <input name="nama" placeholder="nama lokasi" required class="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm">
+      <button class="shrink-0 rounded-lg bg-emerald-600 px-3 py-2 text-sm">Tambah</button>
+    </form>
+    <ul class="mt-3 space-y-1 text-sm">
+      {% for l in lokasis %}
+      <li class="flex items-center justify-between rounded-lg bg-slate-950/40 px-3 py-1.5">
+        <span>{{ l.nama }}</span>
+        {% if not l.is_default %}
+        <form method="post" action="/pengaturan/hapus">
+          <input type="hidden" name="jenis" value="lokasi"><input type="hidden" name="id" value="{{ l.id }}">
+          <button class="text-xs text-rose-400">hapus</button>
+        </form>
+        {% else %}<span class="text-xs text-slate-600">bawaan</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+</div>
+
+<section class="mt-5 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+  <h2 class="font-medium">Tag</h2>
+  <p class="mt-1 text-xs text-slate-500">Tag dibuat otomatis dari form item; daftar ini untuk mengecek yang sudah dipakai.</p>
+  <div class="mt-2 flex flex-wrap gap-2 text-sm">
+    {% for t in tags %}<span class="rounded bg-slate-800 px-2 py-0.5">#{{ t.nama }}</span>{% else %}<span class="text-slate-500">belum ada</span>{% endfor %}
+  </div>
+</section>
+{% endblock %}
