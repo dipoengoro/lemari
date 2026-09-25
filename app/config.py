@@ -27,9 +27,12 @@ THUMB_MAX_PX = int(_env("LEMARI_THUMB_MAX_PX", "400"))
 HEADER_USER = _env("LEMARI_HEADER_USER", "Remote-User")
 DEV_USER = _env("LEMARI_DEV_USER")
 
-# AI auto-tag (OpenRouter)
+# AI auto-tag: penyedia model vision (LEMARI_AI_PROVIDER=deepseek|openrouter)
 OPENROUTER_KEY = _env("LEMARI_OPENROUTER_KEY")
-VISION_MODEL = _env("LEMARI_VISION_MODEL", "google/gemini-3.8-flash")
+DEEPSEEK_KEY = _env("LEMARI_DEEPSEEK_KEY") or _env("DEEPSEEK_API_KEY")
+AI_PROVIDER = (_env("LEMARI_AI_PROVIDER") or ("deepseek" if DEEPSEEK_KEY else "openrouter")).lower()
+_BAWAAAN_MODEL = {"deepseek": "deepseek-flash", "openrouter": "google/gemini-3.8-flash"}
+VISION_MODEL = _env("LEMARI_VISION_MODEL") or _BAWAAAN_MODEL.get(AI_PROVIDER, "google/gemini-3.8-flash")
 AI_AKTIF = _env("LEMARI_AI", "1") not in ("0", "false", "False", "")
 
 # bot Telegram

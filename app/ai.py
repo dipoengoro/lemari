@@ -16,9 +16,30 @@ from . import config
 
 log = logging.getLogger("lemari.ai")
 
-URL = "https://openrouter.ai/api/v1/chat/completions"
 MAKS_PX = 1024          # foto dikecilkan dulu: lebih cepat, lebih murah, lebih jarang gagal
 PERCOBAAN = 3
+
+
+def _penyedia() -> dict:
+    """Penyedia model vision: 'deepseek' (bawaan kalau kuncinya ada) atau 'openrouter'."""
+    if config.AI_PROVIDER == "deepseek":
+        return {
+            "nama": "DeepSeek",
+            "url": "https://api.deepseek.com/chat/completions",
+            "kunci": config.DEEPSEEK_KEY,
+            "headers": {},
+            # model penalaran: token "berpikir" ikut dihitung, jadi jatahnya harus lega
+            "max_tokens": 1600,
+            "json_mode": True,
+        }
+    return {
+        "nama": "OpenRouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "kunci": config.OPENROUTER_KEY,
+        "headers": {"HTTP-Referer": f"https://{config.DOMAIN}", "X-Title": "Lemari"},
+        "max_tokens": 700,
+        "json_mode": False,
+    }
 
 PROMPT = """Kamu membantu mencatat barang yang dipakai sehari-hari (pakaian, sepatu, tas, aksesoris, parfum).
 Lihat foto ini dan isi atribut barang dalam bahasa Indonesia.
@@ -53,15 +74,22 @@ def _siapkan_gambar(gambar: bytes, mime: str) -> tuple[bytes, str]:
 
 
 def _bersihkan_json(teks: str) -> dict:
+    """Ambil objek JSON dari balasan model, walau dibungkus pagar kode atau ditempeli prosa."""
     teks = teks.strip()
-    teks = re.sub(r"^```(?:json)?|```$", "", teks, flags=re.MULTILINE).strip()
-    cocok = re.search(r"\{.*\}", teks, re.DOTALL)
-    if not cocok:
+    teks = re.sub(r"```(?:json)?", "", teks, flags=re.IGNORECASE).strip()
+    awal, akhir = teks.find("{"), teks.rfind("}")
+    if awal < 0 or akhir <= awal:
         raise AiGagal("Balasan AI tidak berbentuk data yang bisa dibaca.")
+    calon = teks[awal : akhir + 1]
     try:
-        return json.loads(cocok.group(0))
-    except json.JSONDecodeError as exc:
-        raise AiGagal(f"Balasan AI tidak bisa dibaca ({exc.msg}).") from exc
+        return json.loads(calon)
+    except json.JSONDecodeError:
+        # kadang ada koma berlebih sebelum penutup (model bahasa Indonesia sering begitu)
+        rapi = re.sub(r",\s*([}\]])", r"\1", calon)
+        try:
+            return json.loads(rapi)
+        except json.JSONDecodeError as exc:
+            raise AiGagal(f"Balasan AI tidak bisa dibaca ({exc.msg}).") from exc
 
 
 def _paskan_kategori(nama: str | None, daftar: list[str]) -> str | None:
@@ -81,14 +109,15 @@ def tebak_atribut(gambar: bytes, daftar_kategori: list[str], mime: str = "image/
     """Kembalikan usulan atribut. Naikkan AiGagal kalau tidak tersedia/gagal (upload tetap jalan)."""
     if not config.AI_AKTIF:
         raise AiGagal("Fitur auto-tag sedang dimatikan (LEMARI_AI=0).")
-    if not config.OPENROUTER_KEY:
-        raise AiGagal("Kunci OpenRouter belum diset di server.")
+    penyedia = _penyedia()
+    if not penyedia["kunci"]:
+        raise AiGagal(f"Kunci {penyedia['nama']} belum diset di server.")
 
     isi_gambar, mime_pakai = _siapkan_gambar(gambar, mime)
     payload = {
         "model": config.VISION_MODEL,
         "temperature": 0.2,
-        "max_tokens": 700,
+        "max_tokens": penyedia["max_tokens"],
         "messages": [
             {
                 "role": "user",
@@ -102,21 +131,32 @@ def tebak_atribut(gambar: bytes, daftar_kategori: list[str], mime: str = "image/
             }
         ],
     }
+    if penyedia["json_mode"]:
+        payload["response_format"] = {"type": "json_object"}
     headers = {
-        "Authorization": f"Bearer {config.OPENROUTER_KEY}",
+        "Authorization": f"Bearer {penyedia['kunci']}",
         "Content-Type": "application/json",
-        "HTTP-Referer": f"https://{config.DOMAIN}",
-        "X-Title": "Lemari",
+        **penyedia["headers"],
     }
 
     pesan_terakhir = ""
     for ke in range(1, PERCOBAAN + 1):
         try:
-            with httpx.Client(timeout=90) as klien:
-                resp = klien.post(URL, json=payload, headers=headers)
+            with httpx.Client(timeout=120) as klien:
+                resp = klien.post(penyedia["url"], json=payload, headers=headers)
+
+            if resp.status_code == 400 and "response_format" in payload and "response_format" in resp.text:
+                # model tidak mendukung mode JSON wajib — ulangi tanpa itu
+                log.warning("auto-tag: %s menolak response_format, dicoba tanpa itu", penyedia["nama"])
+                payload.pop("response_format", None)
+                continue
+
             if resp.status_code == 200:
-                isi = resp.json()["choices"][0]["message"].get("content") or ""
-                log.info("auto-tag ok: %s KiB → %s", len(isi_gambar) // 1024, str(isi)[:120].replace("\n", " "))
+                jawaban = resp.json()
+                isi = jawaban["choices"][0]["message"].get("content") or ""
+                log.info("auto-tag ok (%s/%s): %s KiB · usage=%s → %s",
+                         penyedia["nama"], config.VISION_MODEL, len(isi_gambar) // 1024,
+                         jawaban.get("usage"), str(isi)[:120].replace("\n", " "))
                 try:
                     hasil = _bersihkan_json(isi)
                 except AiGagal as exc:
@@ -134,12 +174,12 @@ def tebak_atribut(gambar: bytes, daftar_kategori: list[str], mime: str = "image/
                 hasil["yakin"] = bool(hasil.get("yakin", True))
                 return hasil
 
-            pesan_terakhir = f"OpenRouter membalas HTTP {resp.status_code}: {resp.text[:160]}"
+            pesan_terakhir = f"{penyedia['nama']} membalas HTTP {resp.status_code}: {resp.text[:160]}"
             log.warning("auto-tag percobaan %s: %s", ke, pesan_terakhir)
         except AiGagal:
             raise
         except Exception as exc:  # noqa: BLE001
-            pesan_terakhir = f"gagal menghubungi OpenRouter ({type(exc).__name__}: {str(exc)[:120]})"
+            pesan_terakhir = f"gagal menghubungi {penyedia['nama']} ({type(exc).__name__}: {str(exc)[:120]})"
             log.warning("auto-tag percobaan %s: %s", ke, pesan_terakhir)
         if ke < PERCOBAAN:
             time.sleep(1.5 * ke)
