@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block judul %}Katalog · Lemari{% endblock %}
+{% block isi %}
+<form id="filter" class="mb-4 space-y-3"
+      hx-get="/" hx-target="#daftar" hx-swap="outerHTML" hx-push-url="true" hx-trigger="change, keyup changed delay:400ms from:input[name=q]">
+  <div class="flex gap-2">
+    <input type="search" name="q" value="{{ q }}" placeholder="Cari nama, brand, warna, catatan…"
+           class="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm placeholder:text-slate-500">
+    <button type="submit" class="rounded-lg bg-slate-800 px-4 py-2 text-sm">Cari</button>
+  </div>
+  <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+    <select name="kategori" class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm">
+      <option value="">Semua kategori</option>
+      {% for k in kategoris %}
+      <option value="{{ k.id }}" {% if f_kategori == k.id|string %}selected{% endif %}>{{ k.nama }}</option>
+      {% endfor %}
+    </select>
+    <select name="lokasi" class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm">
+      <option value="">Semua lokasi</option>
+      {% for l in lokasis %}
+      <option value="{{ l.id }}" {% if f_lokasi == l.id|string %}selected{% endif %}>{{ l.nama }}</option>
+      {% endfor %}
+    </select>
+    <select name="status" class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm">
+      <option value="">Semua status</option>
+      {% for s in status_list %}
+      <option value="{{ s }}" {% if f_status == s %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+    <select name="tag" class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm">
+      <option value="">Semua tag</option>
+      {% for t in tags %}
+      <option value="{{ t.nama }}" {% if f_tag == t.nama %}selected{% endif %}>#{{ t.nama }}</option>
+      {% endfor %}
+    </select>
+  </div>
+</form>
+
+<form method="post" action="/items/bulk" id="form-bulk">
+  {% include "partials/katalog_isi.html" %}
+
+  <div class="mt-6 rounded-xl border border-slate-800 bg-slate-900/60 p-4 space-y-3">
+    <p class="text-sm text-slate-400">Aksi massal untuk item yang dicentang:</p>
+    <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+      <select name="aksi_status" class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm">
+        <option value="">— ubah status —</option>
+        {% for s in status_list %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+      </select>
+      <select name="aksi_lokasi" class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm">
+        <option value="">— pindah lokasi —</option>
+        {% for l in lokasis %}<option value="{{ l.id }}">{{ l.nama }}</option>{% endfor %}
+      </select>
+      <input name="aksi_tag" placeholder="+ tag (mis. kerja)"
+             class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm">
+    </div>
+    <button class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium hover:bg-emerald-500">Terapkan</button>
+  </div>
+</form>
+{% endblock %}
