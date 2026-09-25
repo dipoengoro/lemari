@@ -1117,6 +1117,144 @@ def hapus_pinjam(loan_id: int, session: Session = Depends(get_session)):
     return RedirectResponse("/pinjam", status_code=303)
 
 
+# ---------- Fase 5: statistik ----------
+
+
+def _baris(session: Session, kueri: str, param: dict | None = None) -> list:
+    return list(session.execute(text(kueri), param or {}).fetchall())
+
+
+def _persen(daftar: list, ambil_idx: int = 1) -> list[tuple]:
+    """Ubah daftar baris jadi (baris, persen 0-100) untuk lebar bar di template."""
+    if not daftar:
+        return []
+    nilai_maks = max((float(b[ambil_idx] or 0) for b in daftar), default=0) or 1
+    return [(b, round(float(b[ambil_idx] or 0) / nilai_maks * 100)) for b in daftar]
+
+
+@router.get("/statistik", response_class=HTMLResponse)
+def halaman_statistik(request: Request, session: Session = Depends(get_session)):
+    ringkas = _baris(
+        session,
+        """
+        select (select count(*) from items)                                        as jumlah_item,
+               (select coalesce(sum(harga_beli), 0) from items)                     as nilai,
+               (select count(*) from items where harga_beli is not null)            as ada_harga,
+               (select count(*) from item_photos)                                   as jumlah_foto,
+               (select count(*) from wear_log)                                      as total_pakai,
+               (select count(*) from wear_log where tanggal >= current_date - 30)   as pakai_30,
+               (select count(*) from outfits)                                       as jumlah_outfit,
+               (select coalesce(sum(perkiraan_harga), 0) from wishlist where status = 'ide') as nilai_wishlist,
+               (select count(*) from wash_batches where selesai = false)             as cuci_berjalan,
+               (select coalesce(sum(biaya), 0) from wash_batches
+                 where jalur = 'laundry' and selesai = true
+                   and to_char(tanggal_mulai, 'YYYY-MM') = to_char(current_date, 'YYYY-MM')) as laundry_bulan_ini
+        """,
+    )[0]
+
+    per_status = _persen(_baris(session, "select status, count(*) from items group by status order by 2 desc"))
+    per_kategori = _persen(
+        _baris(
+            session,
+            """
+            select coalesce(c.nama, '(tanpa kategori)') as nama, count(*) as jumlah
+              from items i left join categories c on c.id = i.kategori_id
+             group by 1 order by 2 desc limit 12
+            """,
+        )
+    )
+    per_lokasi = _persen(
+        _baris(
+            session,
+            """
+            select coalesce(l.nama, '(belum ditentukan)') as nama, count(*) as jumlah
+              from items i left join locations l on l.id = i.lokasi_id
+             group by 1 order by 2 desc limit 12
+            """,
+        )
+    )
+    cpw_mahal = _baris(
+        session,
+        """
+        select nama, jumlah_pakai, harga_beli, cost_per_wear
+          from v_cost_per_wear
+         where jumlah_pakai > 0 and cost_per_wear is not null
+         order by cost_per_wear desc limit 8
+        """,
+    )
+    cpw_murah = _baris(
+        session,
+        """
+        select nama, jumlah_pakai, harga_beli, cost_per_wear
+          from v_cost_per_wear
+         where jumlah_pakai > 0 and cost_per_wear is not null
+         order by cost_per_wear asc limit 8
+        """,
+    )
+    sering_dipakai = _persen(
+        _baris(
+            session,
+            """
+            select i.nama, count(*) as kali
+              from wear_log w join items i on i.id = w.item_id
+             group by 1 order by 2 desc limit 10
+            """,
+        )
+    )
+    nganggur = _baris(
+        session,
+        """
+        select i.nama, i.status,
+               (select max(w.tanggal) from wear_log w where w.item_id = i.id)          as terakhir,
+               (select count(*) from wear_log w where w.item_id = i.id)                as kali,
+               coalesce(i.tanggal_beli, i.created_at::date)                            as masuk
+          from items i
+         where not exists (select 1 from wear_log w
+                            where w.item_id = i.id and w.tanggal >= current_date - 90)
+         order by terakhir nulls first, masuk
+         limit 15
+        """,
+    )
+    tren_belanja = _persen(
+        _baris(
+            session,
+            """
+            select to_char(date_trunc('month', coalesce(tanggal_beli, created_at::date)), 'YYYY-MM') as bulan,
+                   count(*) as jumlah,
+                   coalesce(sum(harga_beli), 0) as nilai
+              from items
+             where coalesce(tanggal_beli, created_at::date) >= (date_trunc('month', current_date) - interval '11 months')
+             group by 1 order by 1
+            """,
+        ),
+        ambil_idx=1,
+    )
+    laundry = _baris(
+        session,
+        "select bulan, jumlah_batch, jumlah_item, total_biaya, biaya_per_item from v_laundry_bulanan limit 6",
+    )
+
+    return templates.TemplateResponse(
+        request,
+        "statistik.html",
+        {
+            "request": request,
+            "user": request.state.user,
+            "ringkas": ringkas,
+            "per_status": per_status,
+            "per_kategori": per_kategori,
+            "per_lokasi": per_lokasi,
+            "cpw_mahal": cpw_mahal,
+            "cpw_murah": cpw_murah,
+            "sering_dipakai": sering_dipakai,
+            "nganggur": nganggur,
+            "tren_belanja": tren_belanja,
+            "laundry": laundry,
+            "hari_ini": date.today(),
+        },
+    )
+
+
 @router.get("/media/{jalur:path}")
 def ambil_media(jalur: str):
     """Sajikan foto dari folder uploads (tetap di balik SSO karena lewat app)."""

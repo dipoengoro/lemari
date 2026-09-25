@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block judul %}Statistik · Lemari{% endblock %}
+{% block isi %}
+<h1 class="text-xl font-semibold">Statistik lemari</h1>
+<p class="mt-1 text-sm text-slate-400">Diperbarui {{ hari_ini.strftime('%d %b %Y') }} · semua angka dihitung langsung dari data.</p>
+
+<section class="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+  <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+    <p class="text-xs text-slate-500">Barang tercatat</p>
+    <p class="mt-1 text-lg font-semibold">{{ ringkas[0] }}</p>
+  </div>
+  <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+    <p class="text-xs text-slate-500">Nilai lemari</p>
+    <p class="mt-1 text-lg font-semibold">Rp {{ '{:,.0f}'.format(ringkas[1]|float).replace(',', '.') }}</p>
+    <p class="text-[10px] text-slate-500">dari {{ ringkas[2] }} barang berharga</p>
+  </div>
+  <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+    <p class="text-xs text-slate-500">Foto tersimpan</p>
+    <p class="mt-1 text-lg font-semibold">{{ ringkas[3] }}</p>
+  </div>
+  <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+    <p class="text-xs text-slate-500">Total pemakaian</p>
+    <p class="mt-1 text-lg font-semibold">{{ ringkas[4] }}</p>
+    <p class="text-[10px] text-slate-500">{{ ringkas[5] }} kali dalam 30 hari</p>
+  </div>
+  <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+    <p class="text-xs text-slate-500">Outfit tersimpan</p>
+    <p class="mt-1 text-lg font-semibold">{{ ringkas[6] }}</p>
+  </div>
+  <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+    <p class="text-xs text-slate-500">Wishlist perkiraan</p>
+    <p class="mt-1 text-lg font-semibold">Rp {{ '{:,.0f}'.format(ringkas[7]|float).replace(',', '.') }}</p>
+  </div>
+  <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+    <p class="text-xs text-slate-500">Batch cuci berjalan</p>
+    <p class="mt-1 text-lg font-semibold">{{ ringkas[8] }}</p>
+  </div>
+  <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+    <p class="text-xs text-slate-500">Laundry bulan ini</p>
+    <p class="mt-1 text-lg font-semibold">Rp {{ '{:,.0f}'.format(ringkas[9]|float).replace(',', '.') }}</p>
+  </div>
+</section>
+
+<div class="mt-6 grid gap-5 lg:grid-cols-3">
+  <section class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+    <h2 class="text-sm font-medium text-slate-300">Status barang</h2>
+    {% for b, p in per_status %}
+    <div class="mt-2">
+      <div class="flex justify-between text-xs"><span>{{ b[0] }}</span><span class="text-slate-400">{{ b[1] }}</span></div>
+      <div class="mt-1 h-2 rounded-full bg-slate-800"><div class="h-2 rounded-full bg-emerald-600" style="width: {{ p }}%"></div></div>
+    </div>
+    {% else %}
+    <p class="mt-2 text-xs text-slate-500">Belum ada barang.</p>
+    {% endfor %}
+  </section>
+
+  <section class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+    <h2 class="text-sm font-medium text-slate-300">Komposisi kategori</h2>
+    {% for b, p in per_kategori %}
+    <div class="mt-2">
+      <div class="flex justify-between text-xs"><span>{{ b[0] }}</span><span class="text-slate-400">{{ b[1] }}</span></div>
+      <div class="mt-1 h-2 rounded-full bg-slate-800"><div class="h-2 rounded-full bg-sky-600" style="width: {{ p }}%"></div></div>
+    </div>
+    {% else %}
+    <p class="mt-2 text-xs text-slate-500">Belum ada barang.</p>
+    {% endfor %}
+  </section>
+
+  <section class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+    <h2 class="text-sm font-medium text-slate-300">Tersimpan di lokasi</h2>
+    {% for b, p in per_lokasi %}
+    <div class="mt-2">
+      <div class="flex justify-between text-xs"><span>{{ b[0] }}</span><span class="text-slate-400">{{ b[1] }}</span></div>
+      <div class="mt-1 h-2 rounded-full bg-slate-800"><div class="h-2 rounded-full bg-amber-600" style="width: {{ p }}%"></div></div>
+    </div>
+    {% else %}
+    <p class="mt-2 text-xs text-slate-500">Belum ada barang.</p>
+    {% endfor %}
+  </section>
+</div>
+
+<div class="mt-6 grid gap-5 lg:grid-cols-2">
+  <section class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+    <h2 class="text-sm font-medium text-slate-300">Paling mahal per pakai</h2>
+    <p class="mt-1 text-xs text-slate-500">Harga beli dibagi jumlah pemakaian — kandidat untuk lebih sering dipakai atau dilepas.</p>
+    <ul class="mt-2 divide-y divide-slate-800 text-sm">
+      {% for nama, kali, harga, cpw in cpw_mahal %}
+      <li class="flex items-center justify-between gap-3 py-2">
+        <span class="truncate">{{ nama }}</span>
+        <span class="text-xs text-slate-500">{{ kali }}× dari Rp {{ '{:,.0f}'.format(harga|float).replace(',', '.') }}</span>
+        <span class="font-medium">Rp {{ '{:,.0f}'.format(cpw|float).replace(',', '.') }}</span>
+      </li>
+      {% else %}
+      <li class="py-2 text-xs text-slate-500">Belum ada data pemakaian.</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+    <h2 class="text-sm font-medium text-slate-300">Paling hemat per pakai</h2>
+    <p class="mt-1 text-xs text-slate-500">Barang yang harganya paling "terbayar" karena sering dipakai.</p>
+    <ul class="mt-2 divide-y divide-slate-800 text-sm">
+      {% for nama, kali, harga, cpw in cpw_murah %}
+      <li class="flex items-center justify-between gap-3 py-2">
+        <span class="truncate">{{ nama }}</span>
+        <span class="text-xs text-slate-500">{{ kali }}×</span>
+        <span class="font-medium">Rp {{ '{:,.0f}'.format(cpw|float).replace(',', '.') }}</span>
+      </li>
+      {% else %}
+      <li class="py-2 text-xs text-slate-500">Belum ada data pemakaian.</li>
+      {% endfor %}
+    </ul>
+  </section>
+</div>
+
+<div class="mt-6 grid gap-5 lg:grid-cols-2">
+  <section class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+    <h2 class="text-sm font-medium text-slate-300">Paling sering dipakai</h2>
+    {% for b, p in sering_dipakai %}
+    <div class="mt-2">
+      <div class="flex justify-between text-xs"><span class="truncate">{{ b[0] }}</span><span class="text-slate-400">{{ b[1] }}×</span></div>
+      <div class="mt-1 h-2 rounded-full bg-slate-800"><div class="h-2 rounded-full bg-emerald-500" style="width: {{ p }}%"></div></div>
+    </div>
+    {% else %}
+    <p class="mt-2 text-xs text-slate-500">Belum ada pemakaian tercatat.</p>
+    {% endfor %}
+  </section>
+
+  <section class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+    <h2 class="text-sm font-medium text-slate-300">Nganggur 90 hari</h2>
+    <p class="mt-1 text-xs text-slate-500">Tidak pernah dipakai dalam 90 hari terakhir — kandidat disimpan atau dilepas.</p>
+    <ul class="mt-2 divide-y divide-slate-800 text-sm">
+      {% for nama, status, terakhir, kali, masuk in nganggur %}
+      <li class="flex items-center justify-between gap-3 py-2">
+        <span class="truncate">{{ nama }}</span>
+        <span class="text-xs text-slate-500">
+          {% if kali == 0 %}belum pernah dipakai{% else %}terakhir {{ terakhir.strftime('%d %b %Y') }}{% endif %}
+          · {{ status }}
+        </span>
+      </li>
+      {% else %}
+      <li class="py-2 text-xs text-slate-500">Semua barang dipakai dalam 90 hari terakhir. Bagus!</li>
+      {% endfor %}
+    </ul>
+  </section>
+</div>
+
+<div class="mt-6 grid gap-5 lg:grid-cols-2">
+  <section class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+    <h2 class="text-sm font-medium text-slate-300">Tren belanja 12 bulan</h2>
+    {% for b, p in tren_belanja %}
+    <div class="mt-2">
+      <div class="flex justify-between text-xs">
+        <span>{{ b[0] }}</span>
+        <span class="text-slate-400">{{ b[1] }} barang · Rp {{ '{:,.0f}'.format(b[2]|float).replace(',', '.') }}</span>
+      </div>
+      <div class="mt-1 h-2 rounded-full bg-slate-800"><div class="h-2 rounded-full bg-fuchsia-600" style="width: {{ p }}%"></div></div>
+    </div>
+    {% else %}
+    <p class="mt-2 text-xs text-slate-500">Belum ada data belanja.</p>
+    {% endfor %}
+  </section>
+
+  <section class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+    <h2 class="text-sm font-medium text-slate-300">Biaya laundry per bulan</h2>
+    <ul class="mt-2 divide-y divide-slate-800 text-sm">
+      {% for bulan, batch, item, total, per_item in laundry %}
+      <li class="flex items-center justify-between gap-3 py-2">
+        <span>{{ bulan }}</span>
+        <span class="text-xs text-slate-500">{{ batch }} setoran · {{ item }} barang</span>
+        <span class="font-medium">Rp {{ '{:,.0f}'.format(total|float).replace(',', '.') }}</span>
+        <span class="text-xs text-slate-500">≈ Rp {{ '{:,.0f}'.format(per_item|float).replace(',', '.') }}/barang</span>
+      </li>
+      {% else %}
+      <li class="py-2 text-xs text-slate-500">Belum ada setoran laundry.</li>
+      {% endfor %}
+    </ul>
+  </section>
+</div>
+{% endblock %}
