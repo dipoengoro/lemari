@@ -110,6 +110,9 @@ class Item(Base):
         back_populates="item", cascade="all, delete-orphan", order_by="ItemPhoto.urutan, ItemPhoto.id"
     )
     tags: Mapped[list[Tag]] = relationship(secondary=item_tags, back_populates="items")
+    pemakaian: Mapped[list["WearLog"]] = relationship(
+        back_populates="item", cascade="all, delete-orphan", order_by="WearLog.tanggal.desc()"
+    )
 
     __table_args__ = (Index("ix_items_status_kategori", "status", "kategori_id"),)
 
@@ -119,6 +122,28 @@ class Item(Base):
             if p.is_primary:
                 return p
         return self.photos[0] if self.photos else None
+
+
+class WearLog(Base):
+    """Satu baris = satu item dipakai pada satu tanggal (pakai outfit menulis baris per item)."""
+
+    __tablename__ = "wear_log"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tanggal: Mapped[date] = mapped_column(Date)
+    item_id: Mapped[int | None] = mapped_column(ForeignKey("items.id", ondelete="CASCADE"))
+    outfit_id: Mapped[int | None] = mapped_column(Integer)
+    okasi: Mapped[str | None] = mapped_column(String(60))
+    cuaca: Mapped[str | None] = mapped_column(String(40))
+    catatan: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    item: Mapped[Item | None] = relationship(back_populates="pemakaian")
+
+    __table_args__ = (
+        Index("ix_wear_log_item_tanggal", "item_id", "tanggal"),
+        Index("ix_wear_log_tanggal", "tanggal"),
+    )
 
 
 class ItemPhoto(Base):
