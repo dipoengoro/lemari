@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block judul %}Pinjam-meminjam · Lemari{% endblock %}
+{% block isi %}
+<div class="flex items-center justify-between">
+  <h1 class="text-xl font-semibold">Pinjam-meminjam</h1>
+  <a href="/pinjam/baru" class="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium">+ Catat pinjaman</a>
+</div>
+<p class="mt-1 text-sm text-slate-400">Dua arah: barang kakak yang dipinjam orang, dan barang orang lain yang kakak pinjam.</p>
+
+<section class="mt-5">
+  <h2 class="text-sm font-medium text-slate-300">Dipinjamkan ke orang lain ({{ keluar|length }})</h2>
+  <ul class="mt-2 divide-y divide-slate-800 rounded-xl border border-slate-800 bg-slate-900/60 text-sm">
+    {% for p in keluar %}
+    <li class="flex flex-wrap items-center gap-3 px-4 py-3">
+      <span class="font-medium">{{ p.item.nama }}</span>
+      <span class="text-xs text-slate-400">→ {{ p.nama_pihak }}{% if p.kontak %} ({{ p.kontak }}){% endif %}</span>
+      <span class="text-xs text-slate-500">sejak {{ p.tanggal_pinjam.strftime('%d %b %Y') }}</span>
+      {% if p.lewat_tempo %}
+      <span class="rounded-lg bg-rose-900/50 px-2 py-0.5 text-xs text-rose-300">lewat {{ p.lewat_hari }} hari</span>
+      {% elif p.jatuh_tempo %}
+      <span class="text-xs text-slate-400">jatuh tempo {{ p.jatuh_tempo.strftime('%d %b %Y') }}</span>
+      {% endif %}
+      {% if p.catatan %}<span class="text-xs text-slate-500">{{ p.catatan }}</span>{% endif %}
+      <span class="ml-auto flex items-center gap-2">
+        <form method="post" action="/pinjam/{{ p.id }}/kembali" class="flex items-center gap-1">
+          <input type="date" name="tanggal_kembali" value="{{ hari_ini }}" class="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-xs">
+          <button class="rounded-lg bg-emerald-700 px-2 py-1 text-xs">sudah kembali</button>
+        </form>
+        <form method="post" action="/pinjam/{{ p.id }}/hapus">
+          <button class="text-xs text-rose-400">hapus</button>
+        </form>
+      </span>
+    </li>
+    {% else %}
+    <li class="px-4 py-3 text-slate-500">Tidak ada barang kakak yang sedang dipinjam orang lain.</li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="mt-6">
+  <h2 class="text-sm font-medium text-slate-300">Kakak pinjam dari orang lain ({{ masuk|length }})</h2>
+  <ul class="mt-2 divide-y divide-slate-800 rounded-xl border border-slate-800 bg-slate-900/60 text-sm">
+    {% for p in masuk %}
+    <li class="flex flex-wrap items-center gap-3 px-4 py-3">
+      <span class="font-medium">{{ p.item.nama }}</span>
+      <span class="text-xs text-slate-400">dari {{ p.nama_pihak }}{% if p.kontak %} ({{ p.kontak }}){% endif %}</span>
+      <span class="text-xs text-slate-500">sejak {{ p.tanggal_pinjam.strftime('%d %b %Y') }}</span>
+      {% if p.lewat_tempo %}
+      <span class="rounded-lg bg-amber-900/50 px-2 py-0.5 text-xs text-amber-300">harus dikembalikan — lewat {{ p.lewat_hari }} hari</span>
+      {% elif p.jatuh_tempo %}
+      <span class="text-xs text-slate-400">kembalikan sebelum {{ p.jatuh_tempo.strftime('%d %b %Y') }}</span>
+      {% endif %}
+      <span class="ml-auto flex items-center gap-2">
+        <form method="post" action="/pinjam/{{ p.id }}/kembali" class="flex items-center gap-1">
+          <input type="date" name="tanggal_kembali" value="{{ hari_ini }}" class="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-xs">
+          <button class="rounded-lg bg-emerald-700 px-2 py-1 text-xs">sudah dikembalikan</button>
+        </form>
+        <form method="post" action="/pinjam/{{ p.id }}/hapus">
+          <button class="text-xs text-rose-400">hapus</button>
+        </form>
+      </span>
+    </li>
+    {% else %}
+    <li class="px-4 py-3 text-slate-500">Kakak tidak sedang meminjam barang siapa pun.</li>
+    {% endfor %}
+  </ul>
+</section>
+
+{% if selesai %}
+<section class="mt-6">
+  <h2 class="text-sm font-medium text-slate-300">Sudah kembali</h2>
+  <ul class="mt-2 divide-y divide-slate-800 rounded-xl border border-slate-800 bg-slate-900/60 text-sm">
+    {% for p in selesai %}
+    <li class="flex flex-wrap items-center gap-3 px-4 py-2">
+      <span class="text-xs text-slate-500">{{ p.tanggal_kembali.strftime('%d %b %Y') if p.tanggal_kembali else '' }}</span>
+      <span>{{ p.item.nama }}</span>
+      <span class="text-xs text-slate-400">{{ 'dipinjamkan ke' if p.arah == 'keluar' else 'dipinjam dari' }} {{ p.nama_pihak }}</span>
+      <form method="post" action="/pinjam/{{ p.id }}/hapus" class="ml-auto">
+        <button class="text-xs text-rose-400">hapus</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% endblock %}

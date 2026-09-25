@@ -84,6 +84,8 @@
       </form>
       <a href="/cuci/baru?item_id={{ item.id }}{{ '&jalur=laundry' if cuci_berjalan and cuci_berjalan.batch.jalur == 'laundry' else '' }}"
          class="rounded-lg bg-slate-800 px-4 py-2 text-sm">Kirim cuci</a>
+      <a href="/pinjam/baru?item_id={{ item.id }}" class="rounded-lg bg-slate-800 px-4 py-2 text-sm">Catat pinjaman</a>
+      <a href="/outfit/baru?item_id={{ item.id }}" class="rounded-lg bg-slate-800 px-4 py-2 text-sm">Jadikan outfit</a>
       <form method="post" action="/item/{{ item.id }}/hapus"
             onsubmit="return confirm('Hapus {{ item.nama }} beserta fotonya?')">
         <button class="rounded-lg border border-rose-800 px-4 py-2 text-sm text-rose-300">Hapus</button>
@@ -151,6 +153,35 @@
         </li>
         {% else %}
         <li class="px-4 py-3 text-slate-500">Belum pernah masuk cuci/laundry.</li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    <section class="mt-4">
+      <h2 class="text-sm font-medium text-slate-300">Pinjam-meminjam</h2>
+      {% if pinjaman_aktif %}
+      <p class="mt-2 rounded-lg border border-amber-800 bg-amber-950/30 px-4 py-2 text-sm text-amber-300">
+        {% if pinjaman_aktif.arah == 'keluar' %}
+        Sedang dipinjam {{ pinjaman_aktif.nama_pihak }}{% if pinjaman_aktif.kontak %} ({{ pinjaman_aktif.kontak }}){% endif %}
+        sejak {{ pinjaman_aktif.tanggal_pinjam.strftime('%d %b %Y') }}
+        {% if pinjaman_aktif.jatuh_tempo %}· jatuh tempo {{ pinjaman_aktif.jatuh_tempo.strftime('%d %b %Y') }}{% if pinjaman_aktif.lewat_tempo %} (lewat {{ pinjaman_aktif.lewat_hari }} hari){% endif %}{% endif %}
+        {% else %}
+        Kakak meminjam dari {{ pinjaman_aktif.nama_pihak }} sejak {{ pinjaman_aktif.tanggal_pinjam.strftime('%d %b %Y') }}
+        {% if pinjaman_aktif.jatuh_tempo %}· harus kembali sebelum {{ pinjaman_aktif.jatuh_tempo.strftime('%d %b %Y') }}{% endif %}
+        {% endif %}
+      </p>
+      {% endif %}
+      <ul class="mt-2 divide-y divide-slate-800 rounded-xl border border-slate-800 bg-slate-900/60 text-sm">
+        {% for p in riwayat_pinjam %}
+        <li class="flex flex-wrap items-center justify-between gap-2 px-4 py-2">
+          <span>{{ 'dipinjamkan ke' if p.arah == 'keluar' else 'dipinjam dari' }} {{ p.nama_pihak }}</span>
+          <span class="text-xs text-slate-500">
+            {{ p.tanggal_pinjam.strftime('%d %b %Y') }} →
+            {% if p.tanggal_kembali %}kembali {{ p.tanggal_kembali.strftime('%d %b %Y') }}{% else %}belum kembali{% endif %}
+          </span>
+        </li>
+        {% else %}
+        <li class="px-4 py-3 text-slate-500">Belum pernah dipinjam-pinjamkan.</li>
         {% endfor %}
       </ul>
     </section>

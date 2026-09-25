@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block judul %}Wishlist · Lemari{% endblock %}
+{% block isi %}
+<h1 class="text-xl font-semibold">Wishlist</h1>
+<p class="mt-1 text-sm text-slate-400">Barang yang masih dipikirkan. Kalau sudah dibeli, tandai "sudah dibeli" lalu tambahkan ke katalog.</p>
+
+{% if ide %}
+<p class="mt-2 text-sm text-slate-300">Perkiraan total: <span class="font-medium">Rp {{ '{:,.0f}'.format(total_perkiraan).replace(',', '.') }}</span></p>
+{% endif %}
+
+<form method="post" action="/wishlist" class="mt-4 grid gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4 sm:grid-cols-6">
+  <label class="text-sm sm:col-span-2">
+    <span class="text-slate-400">Mau beli apa</span>
+    <input name="nama" placeholder="mis. chino navy" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2" required>
+  </label>
+  <label class="text-sm">
+    <span class="text-slate-400">Kategori</span>
+    <select name="kategori_id" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+      <option value="">—</option>
+      {% for k in kategoris %}<option value="{{ k.id }}">{{ k.nama }}</option>{% endfor %}
+    </select>
+  </label>
+  <label class="text-sm">
+    <span class="text-slate-400">Perkiraan harga</span>
+    <input name="perkiraan_harga" inputmode="numeric" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+  </label>
+  <label class="text-sm">
+    <span class="text-slate-400">Prioritas</span>
+    <select name="prioritas" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+      <option value="1">pengen banget</option>
+      <option value="2" selected>tertarik</option>
+      <option value="3">cuma lihat</option>
+    </select>
+  </label>
+  <label class="text-sm">
+    <span class="text-slate-400">Link / toko</span>
+    <input name="link" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+  </label>
+  <label class="text-sm sm:col-span-5">
+    <span class="text-slate-400">Catatan</span>
+    <input name="catatan" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+  </label>
+  <button class="self-end rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium">Tambah</button>
+</form>
+
+<section class="mt-6">
+  <h2 class="text-sm font-medium text-slate-300">Masih dipikirkan ({{ ide|length }})</h2>
+  <ul class="mt-2 divide-y divide-slate-800 rounded-xl border border-slate-800 bg-slate-900/60 text-sm">
+    {% for w in ide %}
+    <li class="flex flex-wrap items-center gap-3 px-4 py-3">
+      <span class="rounded-lg px-2 py-0.5 text-xs
+        {% if w.prioritas == 1 %}bg-rose-900/50 text-rose-300{% elif w.prioritas == 2 %}bg-amber-900/50 text-amber-300{% else %}bg-slate-800 text-slate-400{% endif %}">
+        {{ prioritas_label[w.prioritas] }}
+      </span>
+      <span class="font-medium">{{ w.nama }}</span>
+      {% if w.kategori %}<span class="text-xs text-slate-500">{{ w.kategori.nama }}</span>{% endif %}
+      {% if w.perkiraan_harga %}<span class="text-xs text-slate-300">Rp {{ '{:,.0f}'.format(w.perkiraan_harga|float).replace(',', '.') }}</span>{% endif %}
+      {% if w.link %}<a href="{{ w.link }}" target="_blank" rel="noopener" class="text-xs text-emerald-400 underline">link</a>{% endif %}
+      {% if w.catatan %}<span class="text-xs text-slate-500">{{ w.catatan }}</span>{% endif %}
+      <span class="ml-auto flex items-center gap-2">
+        <a href="/item/baru?nama={{ w.nama|urlencode }}{{ '&harga_beli=' ~ w.perkiraan_harga|int if w.perkiraan_harga else '' }}{{ '&kategori_id=' ~ w.kategori_id if w.kategori_id else '' }}"
+           class="rounded-lg bg-slate-800 px-2 py-1 text-xs">+ ke katalog</a>
+        <form method="post" action="/wishlist/{{ w.id }}/status">
+          <input type="hidden" name="status" value="dibeli">
+          <button class="rounded-lg bg-emerald-700 px-2 py-1 text-xs">sudah dibeli</button>
+        </form>
+        <form method="post" action="/wishlist/{{ w.id }}/status">
+          <input type="hidden" name="status" value="batal">
+          <button class="text-xs text-slate-400">batal</button>
+        </form>
+        <form method="post" action="/wishlist/{{ w.id }}/hapus">
+          <button class="text-xs text-rose-400">hapus</button>
+        </form>
+      </span>
+    </li>
+    {% else %}
+    <li class="px-4 py-3 text-slate-500">Wishlist kosong.</li>
+    {% endfor %}
+  </ul>
+</section>
+
+{% if selesai %}
+<section class="mt-6">
+  <h2 class="text-sm font-medium text-slate-300">Sudah diputuskan</h2>
+  <ul class="mt-2 divide-y divide-slate-800 rounded-xl border border-slate-800 bg-slate-900/60 text-sm">
+    {% for w in selesai %}
+    <li class="flex flex-wrap items-center gap-3 px-4 py-2">
+      <span class="text-xs text-slate-500">{{ w.status }}</span>
+      <span>{{ w.nama }}</span>
+      {% if w.tanggal_dibeli %}<span class="text-xs text-slate-500">{{ w.tanggal_dibeli.strftime('%d %b %Y') }}</span>{% endif %}
+      <span class="ml-auto flex items-center gap-2">
+        <form method="post" action="/wishlist/{{ w.id }}/status">
+          <input type="hidden" name="status" value="ide">
+          <button class="text-xs text-slate-400">balikin ke ide</button>
+        </form>
+        <form method="post" action="/wishlist/{{ w.id }}/hapus">
+          <button class="text-xs text-rose-400">hapus</button>
+        </form>
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% endblock %}

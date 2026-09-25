@@ -117,6 +117,12 @@ class Item(Base):
     pemakaian: Mapped[list["WearLog"]] = relationship(
         back_populates="item", cascade="all, delete-orphan", order_by="WearLog.tanggal.desc()"
     )
+    outfit_parts: Mapped[list["OutfitItem"]] = relationship(
+        back_populates="item", cascade="all, delete-orphan"
+    )
+    pinjaman: Mapped[list["Loan"]] = relationship(
+        back_populates="item", cascade="all, delete-orphan", order_by="Loan.id.desc()"
+    )
 
     __table_args__ = (Index("ix_items_status_kategori", "status", "kategori_id"),)
 
@@ -213,6 +219,117 @@ class WashItem(Base):
         Index("ix_wash_items_batch", "batch_id"),
         Index("ix_wash_items_item", "item_id"),
     )
+
+
+class Outfit(Base):
+    """Set pakaian yang sering dipakai bareng."""
+
+    __tablename__ = "outfits"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nama: Mapped[str] = mapped_column(String(80))
+    okasi: Mapped[str | None] = mapped_column(String(60))
+    catatan: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    isi: Mapped[list["OutfitItem"]] = relationship(
+        back_populates="outfit", cascade="all, delete-orphan", order_by="OutfitItem.urutan, OutfitItem.id"
+    )
+
+    @property
+    def jumlah_item(self) -> int:
+        return len(self.isi)
+
+    @property
+    def foto_utama(self) -> ItemPhoto | None:
+        """Foto barang pertama yang punya foto — buat thumbnail kartu outfit."""
+        for bagian in self.isi:
+            if bagian.item and bagian.item.photos:
+                return bagian.item.photos[0]
+        return None
+
+
+class OutfitItem(Base):
+    __tablename__ = "outfit_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    outfit_id: Mapped[int] = mapped_column(ForeignKey("outfits.id", ondelete="CASCADE"))
+    item_id: Mapped[int] = mapped_column(ForeignKey("items.id", ondelete="CASCADE"))
+    urutan: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    outfit: Mapped[Outfit] = relationship(back_populates="isi")
+    item: Mapped["Item"] = relationship(back_populates="outfit_parts")
+
+    __table_args__ = (
+        UniqueConstraint("outfit_id", "item_id", name="uq_outfit_items"),
+        Index("ix_outfit_items_outfit", "outfit_id"),
+    )
+
+
+class WishlistItem(Base):
+    """Rencana beli — belum tentu jadi item."""
+
+    __tablename__ = "wishlist"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nama: Mapped[str] = mapped_column(String(120))
+    kategori_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id", ondelete="SET NULL"))
+    perkiraan_harga: Mapped[float | None] = mapped_column(Numeric(12, 2))
+    link: Mapped[str | None] = mapped_column(Text)
+    prioritas: Mapped[int] = mapped_column(Integer, default=2)
+    catatan: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="ide")  # ide | dibeli | batal
+    tanggal_dibeli: Mapped[date | None] = mapped_column(Date)
+    item_id: Mapped[int | None] = mapped_column(ForeignKey("items.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    kategori: Mapped["Category | None"] = relationship()
+    item: Mapped["Item | None"] = relationship()
+
+    __table_args__ = (Index("ix_wishlist_status_prioritas", "status", "prioritas"),)
+
+
+class Loan(Base):
+    """Pinjam-meminjam dua arah: keluar (dipinjamkan) atau masuk (ade yang meminjam)."""
+
+    __tablename__ = "loans"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    arah: Mapped[str] = mapped_column(String(10), default="keluar")
+    nama_pihak: Mapped[str] = mapped_column(String(80))
+    kontak: Mapped[str | None] = mapped_column(String(80))
+    item_id: Mapped[int] = mapped_column(ForeignKey("items.id", ondelete="CASCADE"))
+    status_sebelum: Mapped[str | None] = mapped_column(String(20))
+    tanggal_pinjam: Mapped[date] = mapped_column(Date)
+    jatuh_tempo: Mapped[date | None] = mapped_column(Date)
+    tanggal_kembali: Mapped[date | None] = mapped_column(Date)
+    catatan: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    item: Mapped["Item"] = relationship(back_populates="pinjaman")
+
+    __table_args__ = (
+        Index("ix_loans_aktif", "tanggal_kembali", "jatuh_tempo"),
+        Index("ix_loans_item", "item_id"),
+    )
+
+    @property
+    def aktif(self) -> bool:
+        return self.tanggal_kembali is None
+
+    @property
+    def lewat_tempo(self) -> bool:
+        return self.aktif and self.jatuh_tempo is not None and self.jatuh_tempo < date.today()
+
+    @property
+    def lewat_hari(self) -> int:
+        if not self.lewat_tempo or not self.jatuh_tempo:
+            return 0
+        return (date.today() - self.jatuh_tempo).days
 
 
 class ItemPhoto(Base):

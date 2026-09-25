@@ -14,7 +14,21 @@ from sqlalchemy.orm import Session, selectinload
 
 from . import ai, config, media
 from .db import get_session
-from .models import STATUS_ITEM, Category, Item, ItemPhoto, Location, Tag, WashBatch, WashItem, WearLog
+from .models import (
+    STATUS_ITEM,
+    Category,
+    Item,
+    ItemPhoto,
+    Loan,
+    Location,
+    Outfit,
+    OutfitItem,
+    Tag,
+    WashBatch,
+    WashItem,
+    WearLog,
+    WishlistItem,
+)
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(config.BASE_DIR / "templates"))
@@ -127,7 +141,17 @@ def katalog(
 
 
 @router.get("/item/baru", response_class=HTMLResponse)
-def form_baru(request: Request, session: Session = Depends(get_session)):
+def form_baru(
+    request: Request,
+    nama: str = "",
+    kategori_id: str = "",
+    harga_beli: str = "",
+    jenis: str = "",
+    catatan: str = "",
+    session: Session = Depends(get_session),
+):
+    """Prefill dari query (dipakai tombol "+ ke katalog" di wishlist)."""
+    praf = {"nama": nama, "kategori_id": kategori_id, "harga_beli": harga_beli, "jenis": jenis, "catatan": catatan}
     return templates.TemplateResponse(
         request,
         "item_form.html",
@@ -135,6 +159,7 @@ def form_baru(request: Request, session: Session = Depends(get_session)):
             "request": request,
             "item": None,
             "user": request.state.user,
+            "praf": praf,
             "kategoris": session.scalars(select(Category).order_by(Category.urutan, Category.nama)).all(),
             "lokasis": session.scalars(select(Location).order_by(Location.urutan, Location.nama)).all(),
             "status_list": STATUS_ITEM,
@@ -207,6 +232,8 @@ def detail(request: Request, item_id: int, session: Session = Depends(get_sessio
             "pemakaian": sorted(item.pemakaian, key=lambda w: (w.tanggal, w.id), reverse=True)[:30],
             "cuci_berjalan": next((wi for wi in item.riwayat_cuci if not wi.batch.selesai), None),
             "riwayat_cuci": item.riwayat_cuci[:10],
+            "pinjaman_aktif": next((p for p in item.pinjaman if p.aktif), None),
+            "riwayat_pinjam": item.pinjaman[:10],
         },
     )
 
@@ -223,6 +250,7 @@ def form_edit(request: Request, item_id: int, session: Session = Depends(get_ses
             "request": request,
             "item": item,
             "user": request.state.user,
+            "praf": {},
             "kategoris": session.scalars(select(Category).order_by(Category.urutan, Category.nama)).all(),
             "lokasis": session.scalars(select(Location).order_by(Location.urutan, Location.nama)).all(),
             "status_list": STATUS_ITEM,
@@ -778,6 +806,315 @@ def batal_cuci(batch_id: int, session: Session = Depends(get_session)):
     session.delete(batch)
     session.commit()
     return RedirectResponse("/cuci", status_code=303)
+
+
+# ---------- Fase 4: outfit, wishlist, pinjam-meminjam ----------
+
+ARAH_PINJAM = ("keluar", "masuk")
+PRIORITAS_WISHLIST = {1: "pengen banget", 2: "tertarik", 3: "cuma lihat"}
+
+
+def _item_untuk_pilih(session: Session, limit: int = 300) -> list[Item]:
+    return list(
+        session.scalars(
+            select(Item)
+            .options(selectinload(Item.photos), selectinload(Item.kategori))
+            .order_by(Item.updated_at.desc())
+            .limit(limit)
+        ).all()
+    )
+
+
+@router.get("/outfit", response_class=HTMLResponse)
+def halaman_outfit(request: Request, session: Session = Depends(get_session)):
+    outfits = session.scalars(
+        select(Outfit)
+        .options(selectinload(Outfit.isi).selectinload(OutfitItem.item).selectinload(Item.photos))
+        .order_by(Outfit.updated_at.desc())
+    ).all()
+    return templates.TemplateResponse(
+        request,
+        "outfit.html",
+        {"request": request, "user": request.state.user, "outfits": outfits, "hari_ini": date.today()},
+    )
+
+
+@router.get("/outfit/baru", response_class=HTMLResponse)
+def form_outfit(request: Request, item_id: str = "", session: Session = Depends(get_session)):
+    terpilih = {int(x) for x in item_id.replace(" ", "").split(",") if x.isdigit()}
+    return templates.TemplateResponse(
+        request,
+        "outfit_form.html",
+        {
+            "request": request,
+            "user": request.state.user,
+            "outfit": None,
+            "items": _item_untuk_pilih(session),
+            "terpilih": terpilih,
+        },
+    )
+
+
+@router.get("/outfit/{outfit_id}/edit", response_class=HTMLResponse)
+def form_outfit_edit(outfit_id: int, request: Request, session: Session = Depends(get_session)):
+    outfit = session.scalars(
+        select(Outfit)
+        .options(selectinload(Outfit.isi).selectinload(OutfitItem.item).selectinload(Item.photos))
+        .where(Outfit.id == outfit_id)
+    ).first()
+    if not outfit:
+        raise HTTPException(404, "Outfit tidak ditemukan")
+    terpilih = {bagian.item_id for bagian in outfit.isi}
+    items = _item_untuk_pilih(session)
+    # barang yang sudah ada di outfit harus tetap muncul walau di luar 300 terbaru
+    ada = {i.id for i in items}
+    tambahan = [bagian.item for bagian in outfit.isi if bagian.item_id not in ada]
+    return templates.TemplateResponse(
+        request,
+        "outfit_form.html",
+        {
+            "request": request,
+            "user": request.state.user,
+            "outfit": outfit,
+            "items": tambahan + items,
+            "terpilih": terpilih,
+        },
+    )
+
+
+@router.post("/outfit")
+def simpan_outfit(
+    nama: str = Form(""),
+    okasi: str = Form(""),
+    catatan: str = Form(""),
+    item_ids: list[str] = Form(default=[]),
+    outfit_id: str = Form(""),
+    session: Session = Depends(get_session),
+):
+    nama_bersih = _nama_dari_form(nama)
+    if outfit_id.isdigit():
+        outfit = session.get(Outfit, int(outfit_id))
+        if not outfit:
+            raise HTTPException(404, "Outfit tidak ditemukan")
+        outfit.nama = nama_bersih or outfit.nama
+        outfit.okasi = okasi.strip() or None
+        outfit.catatan = catatan.strip() or None
+        for bagian in list(outfit.isi):
+            session.delete(bagian)
+        session.flush()
+    else:
+        outfit = Outfit(nama=nama_bersih or "Outfit tanpa nama", okasi=okasi.strip() or None,
+                        catatan=catatan.strip() or None)
+        session.add(outfit)
+        session.flush()
+
+    for urutan, mentah in enumerate(item_ids):
+        if not mentah.isdigit():
+            continue
+        if not session.get(Item, int(mentah)):
+            continue
+        session.add(OutfitItem(outfit_id=outfit.id, item_id=int(mentah), urutan=urutan))
+    session.commit()
+    return RedirectResponse("/outfit", status_code=303)
+
+
+@router.post("/outfit/{outfit_id}/pakai")
+def pakai_outfit(
+    outfit_id: int,
+    tanggal: str = Form(""),
+    jadi_kotor: str = Form(""),
+    session: Session = Depends(get_session),
+):
+    """Catat pemakaian: tiap barang di outfit dapat baris wear_log sendiri."""
+    outfit = session.scalars(select(Outfit).options(selectinload(Outfit.isi)).where(Outfit.id == outfit_id)).first()
+    if not outfit:
+        raise HTTPException(404, "Outfit tidak ditemukan")
+    hari = _tanggal_dari_form(tanggal) or date.today()
+    for bagian in outfit.isi:
+        item = session.get(Item, bagian.item_id)
+        if not item:
+            continue
+        session.add(WearLog(tanggal=hari, item_id=item.id, okasi=outfit.okasi, catatan=f"outfit {outfit.nama}"))
+        if jadi_kotor:
+            item.status = "kotor"
+    session.commit()
+    return RedirectResponse(f"/pakai?tanggal={hari.isoformat()}", status_code=303)
+
+
+@router.post("/outfit/{outfit_id}/hapus")
+def hapus_outfit(outfit_id: int, session: Session = Depends(get_session)):
+    outfit = session.get(Outfit, outfit_id)
+    if outfit:
+        session.delete(outfit)
+        session.commit()
+    return RedirectResponse("/outfit", status_code=303)
+
+
+@router.get("/wishlist", response_class=HTMLResponse)
+def halaman_wishlist(request: Request, session: Session = Depends(get_session)):
+    ide = session.scalars(
+        select(WishlistItem)
+        .options(selectinload(WishlistItem.kategori))
+        .where(WishlistItem.status == "ide")
+        .order_by(WishlistItem.prioritas, WishlistItem.created_at.desc())
+    ).all()
+    selesai = session.scalars(
+        select(WishlistItem)
+        .options(selectinload(WishlistItem.kategori))
+        .where(WishlistItem.status != "ide")
+        .order_by(WishlistItem.tanggal_dibeli.desc().nullslast(), WishlistItem.id.desc())
+        .limit(20)
+    ).all()
+    total = sum(float(x.perkiraan_harga) for x in ide if x.perkiraan_harga)
+    return templates.TemplateResponse(
+        request,
+        "wishlist.html",
+        {
+            "request": request,
+            "user": request.state.user,
+            "ide": ide,
+            "selesai": selesai,
+            "kategoris": session.scalars(select(Category).order_by(Category.urutan)).all(),
+            "total_perkiraan": total,
+            "prioritas_label": PRIORITAS_WISHLIST,
+        },
+    )
+
+
+@router.post("/wishlist")
+def simpan_wishlist(
+    nama: str = Form(""),
+    kategori_id: str = Form(""),
+    perkiraan_harga: str = Form(""),
+    link: str = Form(""),
+    prioritas: str = Form("2"),
+    catatan: str = Form(""),
+    session: Session = Depends(get_session),
+):
+    item = WishlistItem(
+        nama=_nama_dari_form(nama) or "Tanpa nama",
+        kategori_id=int(kategori_id) if kategori_id.isdigit() else None,
+        perkiraan_harga=_angka_dari_form(perkiraan_harga),
+        link=link.strip() or None,
+        prioritas=int(prioritas) if prioritas.isdigit() and int(prioritas) in PRIORITAS_WISHLIST else 2,
+        catatan=catatan.strip() or None,
+    )
+    session.add(item)
+    session.commit()
+    return RedirectResponse("/wishlist", status_code=303)
+
+
+@router.post("/wishlist/{wish_id}/status")
+def ubah_status_wishlist(wish_id: int, status: str = Form("dibeli"), session: Session = Depends(get_session)):
+    baris = session.get(WishlistItem, wish_id)
+    if baris:
+        baris.status = status if status in ("ide", "dibeli", "batal") else "ide"
+        baris.tanggal_dibeli = date.today() if baris.status == "dibeli" else None
+        session.commit()
+    return RedirectResponse("/wishlist", status_code=303)
+
+
+@router.post("/wishlist/{wish_id}/hapus")
+def hapus_wishlist(wish_id: int, session: Session = Depends(get_session)):
+    baris = session.get(WishlistItem, wish_id)
+    if baris:
+        session.delete(baris)
+        session.commit()
+    return RedirectResponse("/wishlist", status_code=303)
+
+
+@router.get("/pinjam", response_class=HTMLResponse)
+def halaman_pinjam(request: Request, session: Session = Depends(get_session)):
+    pinjaman = session.scalars(
+        select(Loan).options(selectinload(Loan.item).selectinload(Item.photos)).order_by(Loan.id.desc()).limit(200)
+    ).all()
+    aktif = [p for p in pinjaman if p.aktif]
+    selesai = [p for p in pinjaman if not p.aktif][:20]
+    return templates.TemplateResponse(
+        request,
+        "pinjam.html",
+        {
+            "request": request,
+            "user": request.state.user,
+            "keluar": [p for p in aktif if p.arah == "keluar"],
+            "masuk": [p for p in aktif if p.arah == "masuk"],
+            "selesai": selesai,
+            "hari_ini": date.today(),
+        },
+    )
+
+
+@router.get("/pinjam/baru", response_class=HTMLResponse)
+def form_pinjam(request: Request, item_id: str = "", arah: str = "keluar", session: Session = Depends(get_session)):
+    return templates.TemplateResponse(
+        request,
+        "pinjam_form.html",
+        {
+            "request": request,
+            "user": request.state.user,
+            "items": _item_untuk_pilih(session),
+            "terpilih": int(item_id) if item_id.isdigit() else None,
+            "arah": arah if arah in ARAH_PINJAM else "keluar",
+            "hari_ini": date.today(),
+        },
+    )
+
+
+@router.post("/pinjam")
+def simpan_pinjam(
+    arah: str = Form("keluar"),
+    nama_pihak: str = Form(""),
+    kontak: str = Form(""),
+    item_id: str = Form(""),
+    tanggal_pinjam: str = Form(""),
+    jatuh_tempo: str = Form(""),
+    catatan: str = Form(""),
+    session: Session = Depends(get_session),
+):
+    arah = arah if arah in ARAH_PINJAM else "keluar"
+    if not item_id.isdigit() or not session.get(Item, int(item_id)):
+        return RedirectResponse("/pinjam/baru?kosong=1", status_code=303)
+    item = session.get(Item, int(item_id))
+    pinjaman = Loan(
+        arah=arah,
+        nama_pihak=_nama_dari_form(nama_pihak) or ("Tanpa nama" if arah == "keluar" else "Diri sendiri"),
+        kontak=kontak.strip() or None,
+        item_id=item.id,
+        status_sebelum=item.status or "bersih",
+        tanggal_pinjam=_tanggal_dari_form(tanggal_pinjam) or date.today(),
+        jatuh_tempo=_tanggal_dari_form(jatuh_tempo),
+        catatan=catatan.strip() or None,
+    )
+    session.add(pinjaman)
+    item.status = "dipinjamkan"
+    session.commit()
+    return RedirectResponse("/pinjam", status_code=303)
+
+
+@router.post("/pinjam/{loan_id}/kembali")
+def kembali_pinjam(loan_id: int, tanggal_kembali: str = Form(""), session: Session = Depends(get_session)):
+    pinjaman = session.get(Loan, loan_id)
+    if not pinjaman:
+        raise HTTPException(404, "Catatan pinjaman tidak ditemukan")
+    pinjaman.tanggal_kembali = _tanggal_dari_form(tanggal_kembali) or date.today()
+    item = session.get(Item, pinjaman.item_id)
+    if item:
+        item.status = pinjaman.status_sebelum or "bersih"
+    session.commit()
+    return RedirectResponse("/pinjam", status_code=303)
+
+
+@router.post("/pinjam/{loan_id}/hapus")
+def hapus_pinjam(loan_id: int, session: Session = Depends(get_session)):
+    pinjaman = session.get(Loan, loan_id)
+    if pinjaman:
+        if pinjaman.aktif:
+            item = session.get(Item, pinjaman.item_id)
+            if item and pinjaman.status_sebelum:
+                item.status = pinjaman.status_sebelum
+        session.delete(pinjaman)
+        session.commit()
+    return RedirectResponse("/pinjam", status_code=303)
 
 
 @router.get("/media/{jalur:path}")

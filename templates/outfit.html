@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block judul %}Outfit · Lemari{% endblock %}
+{% block isi %}
+<div class="flex items-center justify-between">
+  <h1 class="text-xl font-semibold">Outfit</h1>
+  <a href="/outfit/baru" class="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium">+ Outfit baru</a>
+</div>
+<p class="mt-1 text-sm text-slate-400">Kumpulan barang yang biasa dipakai bareng. Tekan "Pakai" → setiap barangnya otomatis dicatat di riwayat pemakaian.</p>
+
+<div class="mt-5 grid gap-3 sm:grid-cols-2">
+  {% for o in outfits %}
+  <article class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+    <div class="flex items-start gap-3">
+      {% set foto = o.foto_utama %}
+      {% if foto %}
+      <img src="/media/{{ foto.thumb_relatif }}" class="h-20 w-20 flex-none rounded-lg object-cover" loading="lazy" alt="{{ o.nama }}">
+      {% else %}
+      <div class="flex h-20 w-20 flex-none items-center justify-center rounded-lg bg-slate-800 text-2xl">🧥</div>
+      {% endif %}
+      <div class="min-w-0">
+        <h2 class="truncate font-medium">{{ o.nama }}</h2>
+        <p class="text-xs text-slate-500">
+          {{ o.jumlah_item }} barang{% if o.okasi %} · {{ o.okasi }}{% endif %}
+        </p>
+        {% if o.catatan %}<p class="mt-1 text-xs text-slate-400">{{ o.catatan }}</p>{% endif %}
+      </div>
+    </div>
+
+    <ul class="mt-3 flex flex-wrap gap-1.5">
+      {% for bagian in o.isi %}
+      <li class="rounded-lg bg-slate-800 px-2 py-0.5 text-xs">
+        <a href="/item/{{ bagian.item.id }}" class="hover:text-emerald-400">{{ bagian.item.nama }}</a>
+      </li>
+      {% else %}
+      <li class="text-xs text-slate-500">Belum ada barang di outfit ini.</li>
+      {% endfor %}
+    </ul>
+
+    <div class="mt-3 flex flex-wrap items-center gap-2">
+      <form method="post" action="/outfit/{{ o.id }}/pakai" class="flex items-center gap-2">
+        <input type="hidden" name="tanggal" value="{{ hari_ini }}">
+        <input type="hidden" name="jadi_kotor" value="1">
+        <button class="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium">Pakai hari ini</button>
+      </form>
+      <form method="post" action="/outfit/{{ o.id }}/pakai" class="flex items-center gap-2">
+        <input type="hidden" name="tanggal" value="{{ hari_ini }}">
+        <button class="rounded-lg bg-slate-800 px-3 py-1.5 text-xs">catat tanpa jadi kotor</button>
+      </form>
+      <a href="/outfit/{{ o.id }}/edit" class="text-xs text-slate-400 underline">ubah</a>
+      <form method="post" action="/outfit/{{ o.id }}/hapus" onsubmit="return confirm('Hapus outfit {{ o.nama }}?')">
+        <button class="text-xs text-rose-400">hapus</button>
+      </form>
+    </div>
+  </article>
+  {% else %}
+  <p class="col-span-full rounded-xl border border-slate-800 bg-slate-900/60 p-6 text-center text-slate-400">
+    Belum ada outfit. Bikin satu dari barang yang sudah ada di katalog — misal "kerja: kemeja putih + chino + loafers".
+  </p>
+  {% endfor %}
+</div>
+{% endblock %}

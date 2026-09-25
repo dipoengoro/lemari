@@ -7,7 +7,7 @@
   <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
     <label class="sm:col-span-2 text-sm">
       <span class="text-slate-400">Nama *</span>
-      <input name="nama" required value="{{ item.nama if item else '' }}"
+      <input name="nama" required value="{{ item.nama if item else praf.nama }}"
              class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
     </label>
 
@@ -16,14 +16,14 @@
       <select name="kategori_id" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
         <option value="">— pilih —</option>
         {% for k in kategoris %}
-        <option value="{{ k.id }}" {% if item and item.kategori_id == k.id %}selected{% endif %}>{{ k.grup }} · {{ k.nama }}</option>
+        <option value="{{ k.id }}" {% if (item and item.kategori_id == k.id) or (not item and praf.kategori_id == k.id|string) %}selected{% endif %}>{{ k.grup }} · {{ k.nama }}</option>
         {% endfor %}
       </select>
     </label>
 
     <label class="text-sm">
       <span class="text-slate-400">Jenis</span>
-      <input name="jenis" value="{{ item.jenis or '' if item else '' }}"
+      <input name="jenis" value="{{ item.jenis or '' if item else praf.jenis }}"
              class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
     </label>
 
@@ -81,7 +81,7 @@
 
     <label class="text-sm">
       <span class="text-slate-400">Harga beli (Rp)</span>
-      <input name="harga_beli" inputmode="numeric" value="{{ item.harga_beli|int if item and item.harga_beli else '' }}"
+      <input name="harga_beli" inputmode="numeric" value="{{ item.harga_beli|int if item and item.harga_beli else praf.harga_beli }}"
              class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
     </label>
 
