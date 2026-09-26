@@ -32,6 +32,10 @@ BOT_USER = os.environ.get("LEMARI_BOT_USER", "dipo")
 DATA_DIR = Path(os.environ.get("LEMARI_BOT_DATA", "/data"))
 OFFSET_FILE = DATA_DIR / "bot-offset.json"
 DRAFT_FILE = DATA_DIR / "bot-draft.json"
+# Denyut jantung: ditulis SETIAP kali getUpdates dijawab Telegram dengan sukses (walau tanpa pesan).
+# Watchdog cron membacanya untuk tahu poll-nya masih hidup — bot yang "diam" karena grup sepi tetap
+# punya denyut segar, sedangkan poll yang macet/putus tidak menulis apa-apa.
+HEARTBEAT_FILE = DATA_DIR / "bot-heartbeat.json"
 
 
 def _pasangan_topik() -> tuple[int, int | None]:
@@ -392,6 +396,13 @@ def main() -> None:
             log.warning("getUpdates ditolak: %s", data.get("description"))
             time.sleep(5)
             continue
+
+        _tulis_json(HEARTBEAT_FILE, {
+            "ts": int(time.time()),
+            "iso": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "update": len(data.get("result") or []),
+            "offset": offset,
+        })
 
         for update in data.get("result", []):
             baru = int(update["update_id"]) + 1
