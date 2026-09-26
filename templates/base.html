@@ -13,38 +13,96 @@
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <link rel="stylesheet" href="/static/app.css">
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen">
-  <header class="sticky top-0 z-20 border-b border-slate-800 bg-slate-950/95 backdrop-blur">
-    <div class="mx-auto max-w-5xl px-4 py-3 flex items-center gap-3">
-      <a href="/" class="text-lg font-semibold">🧺 Lemari</a>
-      <span class="text-xs text-slate-500 hidden sm:inline">semua yang kamu pakai</span>
-      <nav class="ml-auto flex items-center gap-3 text-sm">
-        <a href="/" class="hover:text-emerald-400">Katalog</a>
-        <a href="/pakai" class="hover:text-emerald-400">Pakai</a>
-        <a href="/outfit" class="hover:text-emerald-400">Outfit</a>
-        <a href="/cuci" class="hover:text-emerald-400">Cuci</a>
-        <a href="/pinjam" class="hover:text-emerald-400">Pinjam</a>
-        <a href="/riwayat" class="text-slate-400 hover:text-emerald-400">Riwayat</a>
-        <a href="/wishlist" class="text-slate-400 hover:text-emerald-400">Wishlist</a>
-        <a href="/statistik" class="text-slate-400 hover:text-emerald-400">Statistik</a>
-        <a href="/item/baru" class="rounded-lg bg-emerald-600 px-3 py-1.5 font-medium hover:bg-emerald-500">+ Item</a>
-        <a href="/pengaturan" class="text-slate-400 hover:text-emerald-400">⚙</a>
+{% set jalur = request.url.path if request else '/' %}
+{% set utama = [
+  ('Katalog', '/', '🧺'),
+  ('Pakai', '/pakai', '👕'),
+  ('Cuci', '/cuci', '🧼'),
+  ('Outfit', '/outfit', '🎽'),
+] %}
+{% set lain = [
+  ('Riwayat', '/riwayat', '📆'),
+  ('Wishlist', '/wishlist', '⭐'),
+  ('Pinjam', '/pinjam', '🤝'),
+  ('Statistik', '/statistik', '📊'),
+  ('Pengaturan', '/pengaturan', '⚙️'),
+] %}
+<body class="bg-slate-950 text-slate-100 min-h-screen antialiased">
+
+  <header class="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur">
+    <div class="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
+      <a href="/" class="flex items-center gap-2 text-base font-semibold tracking-tight">
+        <span class="text-xl">🧺</span>
+        <span>Lemari</span>
+      </a>
+
+      <nav class="ml-auto hidden items-center gap-0.5 text-sm md:flex">
+        {% for nama, url, ikon in utama %}
+        {% set aktif = (jalur == url) if url == '/' else jalur.startswith(url) %}
+        <a href="{{ url }}"
+           class="rounded-lg px-3 py-2 transition {{ 'bg-slate-800/80 text-emerald-400' if aktif else 'text-slate-400 hover:bg-slate-900 hover:text-slate-100' }}">{{ nama }}</a>
+        {% endfor %}
+        {% for nama, url, ikon in lain %}
+        {% set aktif = jalur.startswith(url) %}
+        <a href="{{ url }}"
+           class="rounded-lg px-3 py-2 transition {{ 'bg-slate-800/80 text-emerald-400' if aktif else 'text-slate-400 hover:bg-slate-900 hover:text-slate-100' }}">{{ nama }}</a>
+        {% endfor %}
       </nav>
+
+      <a href="/item/baru"
+         class="ml-auto flex items-center gap-1.5 rounded-full bg-emerald-600 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 md:ml-2">
+        <span class="text-base leading-none">+</span><span>Item</span>
+      </a>
     </div>
   </header>
 
-  <main class="mx-auto max-w-5xl px-4 py-5 pb-24">
+  <main class="mx-auto max-w-5xl px-4 py-5 pb-28 md:pb-12">
     {% block isi %}{% endblock %}
   </main>
 
-  <footer class="mx-auto max-w-5xl px-4 pb-10 text-xs text-slate-600">
-    v{{ version | default('0.1.0') }} · {{ user or 'user belum terdeteksi' }}
+  <footer class="mx-auto hidden max-w-5xl px-4 pb-10 text-xs text-slate-600 md:block">
+    v{{ version | default('') }} · {{ user or 'user belum terdeteksi' }}
   </footer>
+
+  <nav class="fixed inset-x-0 bottom-0 z-30 border-t border-slate-800/80 bg-slate-950/95 backdrop-blur md:hidden"
+       style="padding-bottom: env(safe-area-inset-bottom)">
+    <div class="mx-auto flex max-w-lg items-stretch px-1">
+      {% for nama, url, ikon in utama %}
+      {% set aktif = (jalur == url) if url == '/' else jalur.startswith(url) %}
+      <a href="{{ url }}"
+         class="flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[11px] {{ 'text-emerald-400' if aktif else 'text-slate-400' }}">
+        <span class="text-lg leading-none">{{ ikon }}</span>
+        <span>{{ nama }}</span>
+      </a>
+      {% endfor %}
+
+      {% set lain_aktif = jalur.startswith('/riwayat') or jalur.startswith('/wishlist') or jalur.startswith('/pinjam')
+                         or jalur.startswith('/statistik') or jalur.startswith('/pengaturan') or jalur.startswith('/item') %}
+      <details class="relative flex-1" id="menu-lainnya">
+        <summary class="flex list-none flex-col items-center gap-0.5 py-2.5 text-[11px] marker:hidden {{ 'text-emerald-400' if lain_aktif else 'text-slate-400' }}">
+          <span class="text-lg leading-none">⋯</span>
+          <span>Lainnya</span>
+        </summary>
+        <div class="absolute bottom-[calc(100%+0.5rem)] right-1 w-52 overflow-hidden rounded-xl border border-slate-800 bg-slate-900 py-1 shadow-2xl shadow-black/50">
+          {% for nama, url, ikon in lain %}
+          <a href="{{ url }}" class="flex items-center gap-3 px-4 py-3 text-sm text-slate-300 active:bg-slate-800">
+            <span>{{ ikon }}</span><span>{{ nama }}</span>
+          </a>
+          {% endfor %}
+        </div>
+      </details>
+    </div>
+  </nav>
 
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
     }
+    // menu "Lainnya" di HP: tutup kalau tap di luar atau setelah pilih menu
+    document.addEventListener('click', (ev) => {
+      const menu = document.getElementById('menu-lainnya');
+      if (menu && menu.open && !menu.contains(ev.target)) menu.open = false;
+    });
   </script>
 </body>
 </html>

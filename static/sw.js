@@ -1,6 +1,6 @@
 /* Service worker Lemari — cukup untuk installable + halaman offline.
    Halaman selalu dari jaringan (data harus segar), aset statis pakai cache. */
-const CACHE = 'lemari-v1';
+const CACHE = 'lemari-v2';
 const ASET = [
   '/static/app.css',
   '/static/icons/icon-192.png',

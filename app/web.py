@@ -32,6 +32,7 @@ from .models import (
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(config.BASE_DIR / "templates"))
+templates.env.globals["version"] = config.VERSION  # dipakai footer di semua halaman
 
 PER_HALAMAN = 24
 
